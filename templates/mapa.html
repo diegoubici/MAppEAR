@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Mapa de Polígonos</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+<style>
+  table.dataTable {
+  border-collapse: collapse !important;
+  border-spacing: 0 !important;
+} 
+
+table.dataTable th,
+table.dataTable td {
+  padding: 2px 4px !important; /* ← antes suele estar en 8-10px */
+}
+
+body { font-family: Arial, sans-serif; margin:0; padding:0; overflow:hidden; }
+header { background-color: #0056b3; color: white; padding: 10px; height:50px; }
+header h2 { margin:0; font-size:18px; display:inline-block; }
+header span { float:right; line-height:30px; }
+
+/* Mapa */
+#map { position: fixed; top: 50px; left: 0; width: 100%; height: calc(100% - 50px); z-index:0; }
+
+/* Contenedor tabla */
+#tabla-container {
+  position: absolute;
+  top: 50px;
+  right: 0;
+  width: 50%;
+  height: calc(100% - 50px);
+  background: #ffffffd9;
+  border: 2px solid #999;
+  border-radius: 8px;
+  overflow: hidden;
+  z-index: 1000;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  display: flex;
+  flex-direction: column;
+}
+
+#tabla-header { background-color: #0056b3; color:white; padding:5px; cursor: move; font-weight:bold; text-align:center; border-radius:5px 5px 0 0; }
+
+#tabla-body { display:flex; flex-direction:column; flex:1; overflow:hidden; padding:0; }
+
+/* Zona superior fija */
+#botonera, #filtros, #edicion-masiva {
+  flex-shrink: 0;
+  padding: 5px;
+  background:#f7f7f7;
+  border-bottom:1px solid #ccc;
+}
+
+#edicion-masiva {
+  background: #e8f4f8;
+  border: 1px solid #0056b3;
+  margin: 2px;
+  border-radius: 4px;
+}
+
+#edicion-masiva .titulo-edicion {
+  font-weight: bold;
+  color: #0056b3;
+  margin-bottom: 5px;
+  text-align: center;
+}
+
+#edicion-masiva .fila-edicion {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+#edicion-masiva input {
+  border: 1px solid #ccc;
+  background: white;
+  padding: 2px 4px;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+#edicion-masiva input:focus {
+  background: #fff;
+  border-color: #0056b3;
+  outline: none;
+}
+
+/* Scroll solo para la tabla */
+#tabla-scroll {
+  flex:1;
+  overflow-y:auto;
+  padding:5px;
+}
+
+/* Zona inferior fija (botones guardar/pdf) */
+#botonera-inferior {
+  flex-shrink: 0;
+  background:#f7f7f7;
+  border-top:1px solid #ccc;
+  padding:8px;
+  text-align:center;
+}
+#tablaPoligonos {
+    border-collapse: collapse;
+}
+
+table.dataTable thead th { background-color:#0056b3; color:white; font-weight:bold; font-size:11px; text-align:left; }
+table.dataTable tbody tr { height:24px; }
+table.dataTable td { text-align:left; vertical-align:middle; padding: 2px 4px; }  /* reduce padding de celdas */
+td input { width: 85%; border:none; background:transparent; font-size:11px; padding:1px 1px; box-sizing:border-box; text-transform:uppercase; }
+
+td input:hover, td input:focus { background:#eef; outline:none; }
+#tablaPoligonos input[type="color"] { width:30px; height:20px; padding:0; border:none; }
+
+button { margin-top:2px; background-color:#0056b3; color:white; border:none; padding:6px 10px; cursor:pointer; border-radius:4px; font-size:11px; }
+button:hover { background-color:#003f80; }
+
+#editarColumnas { background-color:#28a745; }
+#editarColumnas:hover { background-color:#1e7e34; }
+
+tr.seleccionado { background-color:#FFFF99 !important; }
+
+.menu-grabar { display:none; position:absolute; background:white; border:1px solid #ccc; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.2); min-width:160px; z-index:2000; top:auto; bottom:60px; right:60px; }
+.menu-grabar div { padding:8px 12px; font-size:11px; cursor:pointer; transition:background 0.2s; }
+.menu-grabar div:hover { background:#f0f0f0; }
+#tablaPoligonos th:nth-child(1), #tablaPoligonos td:nth-child(1) { width: 20px; }   /* Sel */
+#tablaPoligonos th:nth-child(2), #tablaPoligonos td:nth-child(2) { width: 110px; } /* Nombre */
+#tablaPoligonos th:nth-child(3), #tablaPoligonos td:nth-child(3) { width: 25px; }  /* Has */
+#tablaPoligonos th:nth-child(4), #tablaPoligonos td:nth-child(4) { width: 60px; }  /* Status */
+#tablaPoligonos th:nth-child(5), #tablaPoligonos td:nth-child(5) { width: 60px; }  /* Status1 */
+#tablaPoligonos th:nth-child(6), #tablaPoligonos td:nth-child(6) { width: 60px; }  /* Status2 */
+#tablaPoligonos th:nth-child(7), #tablaPoligonos td:nth-child(7) { width: 60px; }  /* Status3 */
+#tablaPoligonos th:nth-child(8), #tablaPoligonos td:nth-child(8) { width: 70px; }  /* Partido */
+#tablaPoligonos th:nth-child(9), #tablaPoligonos td:nth-child(9) { width: 30px; }  /* Color */
+
+
+#tablaPoligonos td input {
+    width: 95%;       /* ocupa casi toda la celda */
+    max-width: 100%;  /* no se pasa del ancho */
+    box-sizing: border-box;
+}
+
+</style>
+</head>
+<body>
+
+<header>
+<h2>Mapa de Polígonos - {{ usuario }}</h2>
+<span><a href="/logout" style="color:white;">Cerrar sesión</a></span>
+</header>
+
+<div id="map"></div>
+
+<div id="tabla-container">
+  <div id="tabla-header">Editar atributos</div>
+
+  <div id="tabla-body">
+    <div id="botonera">
+      <label>Color en bloque:</label>
+      <select id="colorBloque">
+        <option value="">-- ELEGIR COLOR --</option>
+        {% for c in [
+            {"nombre":"ROJO","codigo":"#FF0000"},{"nombre":"VERDE","codigo":"#00FF00"},{"nombre":"AZUL","codigo":"#0000FF"},
+            {"nombre":"VERDE MENTA","codigo":"#B5EAD7"},{"nombre":"DURAZNO SUAVE","codigo":"#FFDAC1"},{"nombre":"LAVANDA","codigo":"#CBAACB"},
+            {"nombre":"VERDE CLARO","codigo":"#E2F0CB"},{"nombre":"AMARILLO","codigo":"#FFFF00"},{"nombre":"NARANJA","codigo":"#FFA500"},
+            {"nombre":"MORADO","codigo":"#800080"},{"nombre":"CYAN","codigo":"#00FFFF"},{"nombre":"MAGENTA","codigo":"#FF00FF"},
+            {"nombre":"GRIS","codigo":"#808080"},{"nombre":"NEGRO","codigo":"#000000"},{"nombre":"BLANCO","codigo":"#FFFFFF"}
+        ] %}
+        <option value="{{ c.codigo }}">{{ c.nombre }}</option>
+        {% endfor %}
+      </select>
+      <button id="aplicarColor">Aplicar</button>
+
+      <button id="seleccionarFiltrados" style="background-color:#28a745;">Seleccionar</button>
+      <button id="deseleccionarTodos" style="background-color:#dc3545;">Deseleccionar</button>
+      <button id="btnLimpiar" class="btn btn-warning-color:#dc3545;">LIMPIAR</button>
+
+    </div>
+
+    <div id="filtros">
+      <input type="text" placeholder="Sel" data-col="0" style="width:40px;">
+      <input type="text" placeholder="Nombre" data-col="1" style="width:120px;">
+      <input type="text" placeholder="Has" data-col="2" style="width:49px;">
+      <input type="text" placeholder="Status" data-col="3" style="width:56px;">
+      <input type="text" placeholder="Status1" data-col="4" style="width:56px;">
+      <input type="text" placeholder="Status2" data-col="5" style="width:56px;">
+      <input type="text" placeholder="Status3" data-col="6" style="width:56px;">
+      <input type="text" placeholder="Partido" data-col="7" style="width:80px;">
+      <input type="text" placeholder="Color" data-col="8" style="width:60px;">
+    </div>
+
+    <!-- NUEVA SECCIÓN DE EDICIÓN MASIVA -->
+    <div id="edicion-masiva">
+      <div class="titulo-edicion">✏️ EDICIÓN MASIVA DE COLUMNAS</div>
+      <div class="fila-edicion">
+        <span style="width:40px; font-size:10px;">Sel</span>
+        <input type="text" id="edit-nombre" placeholder="Nombre" data-col="1" style="width:120px;">
+        <input type="text" id="edit-has" placeholder="Has" data-col="2" style="width:40px;">
+        <input type="text" id="edit-status" placeholder="Status" data-col="3" style="width:56px;">
+        <input type="text" id="edit-status1" placeholder="Status1" data-col="4" style="width:56px;">
+        <input type="text" id="edit-status2" placeholder="Status2" data-col="5" style="width:80px;">
+        <input type="text" id="edit-status3" placeholder="Status3" data-col="6" style="width:56px;">
+        <input type="text" id="edit-partido" placeholder="Partido" data-col="7" style="width:80px;">
+        <button id="editarColumnas">✏️ EDITAR COLUMNAS</button>
+      </div>
+    </div>
+
+    <div id="tabla-scroll">
+      <table id="tablaPoligonos" class="display" style="width:100%">
+        <thead>
+          <tr>
+            <th>Sel</th>
+            <th>Nombre Productor</th>
+            <th>Has</th>
+            <th>Status</th>
+            <th>Status1</th>
+            <th>Status2</th>
+            <th>Status3</th>
+            <th>Ptdo</th>
+            <th>Color</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for p in poligonos %}
+          <tr data-index="{{ loop.index0 }}">
+            <td><input type="checkbox" class="selectFila"></td>
+            <td><input type="text" value="{{ p.name }}"></td>
+            <td><input type="text" value="{{ p.superficie }}"></td>
+            <td><input type="text" value="{{ p.status }}"></td>
+            <td><input type="text" value="{{ p.status1 }}"></td>
+            <td><input type="text" value="{{ p.status2 }}"></td>
+            <td><input type="text" value="{{ p.status3 }}"></td>
+            <td><input type="text" value="{{ p.partido }}"></td>
+            <td><input type="color" value="{{ p.color }}" class="colorInput"></td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div id="botonera-inferior">
+      <button id="btn-grabar">💾 GUARDAR ▼</button>
+      <button id="exportarPDF" style="background-color:#28a745;">📄 EXPORTAR PDF</button>
+      <div id="menu-grabar" class="menu-grabar">
+        <div id="opcion-grabar">💾 Guardar cambios</div>
+        <div id="opcion-grabar-como">📝 Guardar como...</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- === LIBRERÍAS === -->
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+
+<script>
+const poligonos = {{ poligonos|tojson }};
+const leafletPoligonos = [];
+const seleccionados = new Set();
+
+// Mapa
+const map = L.map('map').setView([-35, -63], 8);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{ attribution:'&copy; OpenStreetMap' }).addTo(map);
+
+poligonos.forEach((p, idx)=>{
+  if(p.coords && p.coords.length>0){
+    const poly = L.polygon(p.coords,{color:"#000000",weight:0.5,fillColor:p.color,fillOpacity:0.6})
+      .addTo(map)
+      .bindPopup("<b>"+p.name+"</b><br>"+p.superficie+" has");
+    poly.index = idx;
+    poly.on('click',()=>{ toggleSeleccion(idx); scrollFila(idx); });
+    leafletPoligonos.push(poly);
+  } else leafletPoligonos.push(null);
+});
+
+const table = $('#tablaPoligonos').DataTable({
+    paging: false,
+    info: false,
+    scrollY: "calc(100vh - 220px)",
+    searching: false,
+    autoWidth: false
+});
+
+function toggleSeleccion(idx){
+  const fila = $('#tablaPoligonos tbody tr').eq(idx);
+  const checkbox = fila.find('input.selectFila');
+  if(seleccionados.has(idx)){
+    seleccionados.delete(idx);
+    fila.removeClass('seleccionado');
+    checkbox.prop('checked',false);
+    if(leafletPoligonos[idx]) leafletPoligonos[idx].setStyle({weight:0.5});
+  } else {
+    seleccionados.add(idx);
+    fila.addClass('seleccionado');
+    checkbox.prop('checked',true);
+    if(leafletPoligonos[idx]) leafletPoligonos[idx].setStyle({weight:2});
+  }
+}
+function scrollFila(idx){
+  const fila = $('#tablaPoligonos tbody tr').eq(idx);
+  fila[0].scrollIntoView({behavior:"smooth", block:"center"});
+}
+$('#tablaPoligonos tbody').on('click','tr',function(e){
+  if($(e.target).is('input')) return;
+  const idx = $(this).data('index');
+  toggleSeleccion(idx);
+  scrollFila(idx);
+});
+$('#tablaPoligonos tbody').on('change','input.selectFila',function(){
+  const idx = $(this).closest('tr').data('index');
+  toggleSeleccion(idx);
+  scrollFila(idx);
+});
+
+$('#aplicarColor').click(()=>{
+  const color = $('#colorBloque').val();
+  if(!color) return;
+  seleccionados.forEach(idx=>{
+    $('#tablaPoligonos tbody tr').eq(idx).find('input.colorInput').val(color);
+    if(leafletPoligonos[idx]) leafletPoligonos[idx].setStyle({fillColor:color});
+  });
+});
+
+$('#seleccionarFiltrados').click(()=>{
+  $('#tablaPoligonos tbody tr:visible').each(function(){
+    const idx = $(this).data('index');
+    if(!seleccionados.has(idx)) toggleSeleccion(idx);
+  });
+});
+$('#deseleccionarTodos').click(()=>{ Array.from(seleccionados).forEach(idx=> toggleSeleccion(idx)); });
+
+// === NUEVA FUNCIONALIDAD: EDICIÓN MASIVA DE COLUMNAS ===
+$('#editarColumnas').click(function(){
+  if(seleccionados.size === 0){
+    alert('Debe seleccionar al menos un registro para editar.');
+    return;
+  }
+
+  let cambiosRealizados = 0;
+  const cambiosDetalle = [];
+
+  // Obtener valores de los campos de edición
+  const valoresEdicion = {
+    1: $('#edit-nombre').val().trim(),      // Nombre
+    2: $('#edit-has').val().trim(),         // Has
+    3: $('#edit-status').val().trim(),      // Status
+    4: $('#edit-status1').val().trim(),     // Status1
+    5: $('#edit-status2').val().trim(),     // Status2
+    6: $('#edit-status3').val().trim(),     // Status3
+    7: $('#edit-partido').val().trim(),     // Partido
+    8: $('#edit-color').val()               // Color
+  };
+
+  // Aplicar cambios a cada registro seleccionado
+  seleccionados.forEach(idx => {
+    const fila = $('#tablaPoligonos tbody tr').eq(idx);
+    const inputs = fila.find('input');
+
+    // Aplicar cada valor si no está vacío
+    Object.keys(valoresEdicion).forEach(col => {
+      const valor = valoresEdicion[col];
+      if(valor !== '') {
+        const inputIndex = parseInt(col);
+        const inputElement = inputs.eq(inputIndex);
+        const valorAnterior = inputElement.val();
+        
+        inputElement.val(valor);
+        
+        // Si es el color, también actualizar el polígono en el mapa
+        if(col === '8' && leafletPoligonos[idx]) {
+          leafletPoligonos[idx].setStyle({fillColor: valor});
+        }
+        
+        if(valorAnterior !== valor) {
+          cambiosRealizados++;
+          cambiosDetalle.push(`Fila ${idx + 1}: ${getColumnName(col)} = "${valor}"`);
+        }
+      }
+    });
+  });
+
+  // Limpiar campos de edición
+  $('#edicion-masiva input[type="text"]').val('');
+  $('#edit-color').val('#000000');
+
+  // Mostrar resultado
+  if(cambiosRealizados > 0) {
+    const mensaje = `✅ Se realizaron ${cambiosRealizados} cambios en ${seleccionados.size} registros seleccionados.\n\nDetalles de cambios:\n${cambiosDetalle.slice(0, 10).join('\n')}${cambiosDetalle.length > 10 ? '\n... y más cambios.' : ''}`;
+    alert(mensaje);
+  } else {
+    alert('ℹ️ No se realizaron cambios. Verifique que haya ingresado valores en los campos de edición.');
+  }
+});
+
+// Función auxiliar para obtener el nombre de la columna
+function getColumnName(col) {
+  const nombres = {
+    '1': 'Nombre',
+    '2': 'Has',
+    '3': 'Status',
+    '4': 'Status1',
+    '5': 'Status2',
+    '6': 'Status3',
+    '7': 'Partido',
+    '8': 'Color'
+  };
+  return nombres[col] || 'Campo';
+}
+
+// === FILTROS ===
+$('#filtros input').on('keyup change', function() {
+  const filtros = {};
+  $('#filtros input').each(function() {
+    const col = $(this).data('col');
+    const val = $(this).val().toUpperCase().trim();
+    if (val) filtros[col] = val;
+  });
+
+  table.rows().every(function() {
+    const row = $(this.node());
+    let mostrar = true;
+
+    for (const col in filtros) {
+      const cellVal = row.find('td').eq(col).find('input').val().toUpperCase();
+      if (!cellVal.includes(filtros[col])) {
+        mostrar = false;
+        break;
+      }
+    }
+    if (mostrar) row.show(); else row.hide();
+  });
+});
+
+// === Botonera flotante ===
+const tabla = document.getElementById("tabla-container");
+const header = document.getElementById("tabla-header");
+let offsetX, offsetY, dragging=false;
+header.addEventListener("mousedown",(e)=>{ dragging=true; offsetX=e.clientX-tabla.offsetLeft; offsetY=e.clientY-tabla.offsetTop; });
+document.addEventListener("mouseup",()=>dragging=false);
+document.addEventListener("mousemove",(e)=>{ if(!dragging) return; tabla.style.left=(e.clientX-offsetX)+"px"; tabla.style.top=(e.clientY-offsetY)+"px"; });
+
+$('#btn-grabar').on('click',()=>{ $('#menu-grabar').toggle(); });
+$(document).on('click',function(e){
+  if(!$(e.target).closest('#btn-grabar, #menu-grabar').length){ $('#menu-grabar').hide(); }
+});
+
+// === Guardar ===
+function obtenerDatos(){
+  const filas = [];
+  $('#tablaPoligonos tbody tr').each(function(idx){
+    const inputs = $(this).find('input');
+    let coords = [];
+    if(leafletPoligonos[idx]){
+      coords = leafletPoligonos[idx].getLatLngs()[0].map(p => `${p.lng},${p.lat}`).join(" ");
+    }
+    filas.push({
+      name: inputs.eq(1).val(),
+      superficie: inputs.eq(2).val(),
+      status: inputs.eq(3).val(),
+      status1: inputs.eq(4).val(),
+      status2: inputs.eq(5).val(),
+      status3: inputs.eq(6).val(),
+      partido: inputs.eq(7).val(),
+      color: inputs.eq(8).val(),
+      COORDENADAS: coords
+    });
+  });
+  return filas;
+}
+
+$('#opcion-grabar').on('click',()=>{
+  fetch('/guardar', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({datos: obtenerDatos()})
+  }).then(r=>r.json()).then(resp=>alert(resp.mensaje || 'Datos guardados.'));
+  $('#menu-grabar').hide();
+});
+
+$('#opcion-grabar-como').off('click').on('click', async ()=>{
+  const fecha = new Date();
+  const dd = String(fecha.getDate()).padStart(2,'0');
+  const mm = String(fecha.getMonth()+1).padStart(2,'0');
+  const aa = String(fecha.getFullYear()).slice(-2);
+  const hh = String(fecha.getHours()).padStart(2,'0');
+  const min = String(fecha.getMinutes()).padStart(2,'0');
+  const sugerido = `poligonos_${dd}-${mm}-${aa}_${hh}-${min}.xlsx`;
+
+  let nuevoNombre = prompt("Ingrese nombre del nuevo archivo (sin extensión o con .xlsx):", sugerido);
+  if(nuevoNombre === null){ $('#menu-grabar').hide(); return; }
+  nuevoNombre = nuevoNombre.trim();
+  if(nuevoNombre.length === 0){ alert("Debe ingresar un nombre válido."); return; }
+  if(!nuevoNombre.toLowerCase().endsWith('.xlsx')){ nuevoNombre += '.xlsx'; }
+
+  try {
+    const payload = { datos: obtenerDatos(), nuevo_nombre: nuevoNombre };
+    const resp = await fetch('/guardar_como', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(payload)
+    });
+    const json = await resp.json();
+    if(json && json.mensaje) alert(json.mensaje);
+    else if(json.success) alert('Archivo guardado correctamente.');
+    else alert('Resultado desconocido al guardar.');
+  } catch (err) { alert('Error al guardar: ' + err); } finally { $('#menu-grabar').hide(); }
+});
+
+$('#exportarPDF').on('click',()=>{
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  const filasPDF = [];
+  seleccionados.forEach(idx=>{
+    const inputs = $('#tablaPoligonos tbody tr').eq(idx).find('input');
+    filasPDF.push([
+      inputs.eq(0).prop('checked') ? 'X' : '',
+      inputs.eq(1).val(),
+      inputs.eq(2).val(),
+      inputs.eq(3).val(),
+      inputs.eq(4).val(),
+      inputs.eq(5).val(),
+      inputs.eq(6).val(),
+      inputs.eq(7).val(),
+      inputs.eq(8).val()
+    ]);
+  });
+  if(filasPDF.length===0){ alert("No hay registros seleccionados para exportar."); return; }
+  doc.autoTable({
+    head: [['Sel','Nombre Productor','Has','Status','Status1','Status2','Status3','Ptdo','Color']],
+    body: filasPDF,
+    theme: 'grid',
+    styles: {fontSize:8},
+    margin: {top:10}
+  });
+  doc.save('poligonos.pdf');
+});
+// === BOTÓN LIMPIAR ===
+document.getElementById("btnLimpiar").addEventListener("click", function() {
+    // Limpiar filtros
+    document.querySelectorAll("#filtros input[type='text']").forEach(input => {
+        input.value = "";
+    });
+
+    // Limpiar campos de edición masiva
+    document.querySelectorAll("#edicion-masiva input[type='text']").forEach(input => {
+        input.value = "";
+    });
+
+    // Restaurar todas las filas visibles
+    $("#tablaPoligonos tbody tr").show();
+
+    // Limpiar selección de color en bloque
+    document.getElementById("colorBloque").value = "";
+
+    alert("Filtros y campos de edición limpiados.");
+});
+
+
+</script>
+</body>
+</html>
