@@ -1,43 +1,31 @@
 @echo off
-echo ========================================
-echo      SUBIENDO MAPPEAR A GITHUB / RENDER
-echo ========================================
+REM =========================================
+REM Script automático para subir MAppEAR a GitHub/Render
+REM =========================================
 
-cd /d C:\MAPPEAR
+REM Cambiar al directorio del proyecto
+cd /d C:\MAppEAR
 
-REM === Verificar instalación de Git ===
-git --version >nul 2>&1
-if errorlevel 1 (
-    echo ❌ ERROR: Git no está instalado o no se encuentra en el PATH.
-    echo Instalalo desde https://git-scm.com/download/win
-    pause
-    exit /b
-)
+REM Mostrar mensaje
+echo =======================================
+echo 🔹 Subiendo proyecto MAppEAR a GitHub...
+echo =======================================
 
-REM === Verificar repositorio ===
-if not exist ".git" (
-    echo ❌ ERROR: No existe repositorio Git en C:\MAPPEAR
-    echo Ejecutá una sola vez estos comandos:
-    echo git init
-    echo git branch -M main
-    echo git remote add origin https://github.com/TU_USUARIO/TU_REPOSITORIO.git
-    pause
-    exit /b
-)
-
-REM === Preguntar mensaje de commit ===
-set /p msg=Escribí el mensaje del commit: 
-if "%msg%"=="" set msg=Actualizacion automatica
-
-echo.
-echo === Subiendo cambios a GitHub ===
+REM Agregar todos los cambios
 git add .
-git commit -m "%msg%"
+
+REM Commit automático con fecha y hora
+for /f "tokens=1-5 delims=/:. " %%d in ("%date% %time%") do (
+    set fecha=%%d-%%e-%%f_%%g-%%h
+)
+git commit -m "Auto commit %fecha%"
+
+REM Push automático a main
 git push origin main
 
+REM Mensaje final
 echo.
-echo ========================================
-echo ✅ Proyecto actualizado en GitHub
-echo ✅ Render actualizará automáticamente la app
-echo ========================================
+echo =======================================
+echo ✅ Proyecto subido correctamente a GitHub/Render
+echo =======================================
 pause
