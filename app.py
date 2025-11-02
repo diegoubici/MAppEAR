@@ -5,9 +5,25 @@ from flask import Flask, render_template, request, jsonify, redirect, url_for, s
 app = Flask(__name__)
 app.secret_key = "BanfiClaveSegura123"
 
-# === CONFIGURACIÓN ===
-DATA_DIR = r"F:\MAPPEAR\data"
-os.makedirs(DATA_DIR, exist_ok=True)
+# === CONFIGURACIÓN: base de datos / carpetas ===
+# Si existe la ruta local F:\MAPPEAR\data se usa (desarrollo local).
+# Si no existe, se usa una carpeta "data" dentro del proyecto (entorno remoto, p.e. Render).
+if os.path.exists(r"F:\MAPPEAR\data"):
+    BASE_DIR = r"F:\MAPPEAR\data"
+else:
+    BASE_DIR = os.path.join(os.getcwd(), "data")
+
+os.makedirs(BASE_DIR, exist_ok=True)
+
+
+def get_user_dir(username):
+    """Devuelve la carpeta específica del usuario dentro de BASE_DIR (la crea si no existe)."""
+    if not username:
+        return None
+    user_dir = os.path.join(BASE_DIR, username)
+    os.makedirs(user_dir, exist_ok=True)
+    return user_dir
+
 
 # Usuarios y roles
 USERS = {
@@ -19,23 +35,14 @@ USERS = {
     "RIVADAVIA": {"password": "rivadavia5", "rol": "user"},
 }
 
-archivo_seleccionado = None
 
 # === FUNCIONES AUXILIARES ===
-def ruta_usuario_actual():
-    """Devuelve la carpeta específica del usuario logueado"""
-    usuario = session.get("usuario")
-    if not usuario:
-        return None
-    ruta = os.path.join(DATA_DIR, usuario)
-    os.makedirs(ruta, exist_ok=True)
-    return ruta
-
-def obtener_archivos():
-    ruta_usuario = ruta_usuario_actual()
-    if not ruta_usuario:
+def obtener_archivos(user_dir):
+    """Lista archivos .xlsx en la carpeta del usuario (user_dir)."""
+    if not user_dir or not os.path.exists(user_dir):
         return []
-    return sorted([f for f in os.listdir(ruta_usuario) if f.endswith(".xlsx")])
+    return sorted([f for f in os.listdir(user_dir) if f.endswith(".xlsx")])
+
 
 def cargar_poligonos(ruta_archivo):
     df = pd.read_excel(ruta_archivo)
@@ -70,6 +77,7 @@ def cargar_poligonos(ruta_archivo):
         })
 
     return poligonos
+
 
 def guardar_poligonos(nuevos_datos, ruta_destino):
     columnas = ["NOMBRE", "SUPERFICIE", "STATUS", "STATUS1", "STATUS2", "STATUS3", "PARTIDO", "COLOR HEX", "COORDENADAS"]
@@ -107,10 +115,12 @@ def guardar_poligonos(nuevos_datos, ruta_destino):
 
     df.to_excel(ruta_destino, index=False)
 
+
 # === LOGIN ===
 @app.route("/", methods=["GET"])
 def login_page():
     return render_template("login.html")
+
 
 @app.route("/login", methods=["POST"])
 def login():
@@ -120,72 +130,96 @@ def login():
     if user and user["password"] == password:
         session["usuario"] = username
         session["rol"] = user["rol"]
+        # Al loguearse vamos directamente a la pantalla de selección de archivos
         return redirect(url_for("seleccionar_archivo"))
     else:
         return render_template("login.html", error="Usuario o contraseña incorrectos.")
+
 
 @app.route("/logout")
 def logout():
     session.clear()
     return redirect("https://www.google.com.ar")
 
+
 # === SELECCIONAR ARCHIVO ===
 @app.route("/inicio")
 def seleccionar_archivo():
     if "usuario" not in session:
         return redirect(url_for("login_page"))
-    archivos = obtener_archivos()
+
+    user_dir = get_user_dir(session["usuario"])
+    archivos = obtener_archivos(user_dir)
     return render_template("seleccionar_archivo.html", archivos=archivos,
                            usuario=session["usuario"], rol=session["rol"])
+
 
 # === ABRIR ARCHIVO ===
 @app.route("/abrir/<nombre>")
 def abrir_archivo(nombre):
-    global archivo_seleccionado
-    archivos = obtener_archivos()
+    if "usuario" not in session:
+        return redirect(url_for("login_page"))
+
+    user_dir = get_user_dir(session["usuario"])
+    archivos = obtener_archivos(user_dir)
     if nombre not in archivos:
         return "Archivo no encontrado", 404
-    archivo_seleccionado = nombre
-    ruta = os.path.join(ruta_usuario_actual(), archivo_seleccionado)
+
+    # Guardar la selección en la sesión (por usuario)
+    session['archivo_seleccionado'] = nombre
+
+    ruta = os.path.join(user_dir, nombre)
     poligonos = cargar_poligonos(ruta)
     return render_template("mapa.html", usuario=session["usuario"],
                            rol=session["rol"], poligonos=poligonos)
 
+
 # === NUEVO ARCHIVO ===
 @app.route("/nuevo_archivo", methods=["POST"])
 def nuevo_archivo():
-    global archivo_seleccionado
     nombre = request.form.get("nombre")
-    if not nombre.endswith(".xlsx"):
+    if not nombre:
+        return jsonify({"success": False, "mensaje": "Nombre inválido."})
+    if not nombre.lower().endswith(".xlsx"):
         nombre += ".xlsx"
 
-    ruta_nueva = os.path.join(ruta_usuario_actual(), nombre)
+    user_dir = get_user_dir(session.get("usuario"))
+    if not user_dir:
+        return jsonify({"success": False, "mensaje": "Usuario no logueado."})
+
+    ruta_nueva = os.path.join(user_dir, nombre)
     if os.path.exists(ruta_nueva):
         return jsonify({"success": False, "mensaje": "El archivo ya existe."})
 
     df = pd.DataFrame(columns=["NOMBRE", "SUPERFICIE", "STATUS", "STATUS1", "STATUS2", "STATUS3", "PARTIDO", "COLOR HEX", "COORDENADAS"])
     df.to_excel(ruta_nueva, index=False)
-    archivo_seleccionado = nombre
+
+    # No seleccionamos automáticamente el archivo nuevo para forzar que el usuario lo abra desde /inicio
     return jsonify({"success": True, "archivo": nombre})
+
 
 # === GUARDAR ===
 @app.route("/guardar", methods=["POST"])
 def guardar():
-    global archivo_seleccionado
-    if archivo_seleccionado is None:
-        return jsonify({"success": False, "mensaje": "No hay archivo seleccionado."})
+    archivo_sel = session.get('archivo_seleccionado')
+    if not archivo_sel:
+        return jsonify({"success": False, "mensaje": "No hay archivo seleccionado. Elegí uno en la pantalla de inicio."})
     try:
         data = request.get_json(force=True)
-        ruta = os.path.join(ruta_usuario_actual(), archivo_seleccionado)
+        if not data or "datos" not in data:
+            return jsonify({"success": False, "mensaje": "Datos inválidos."})
+
+        user_dir = get_user_dir(session.get("usuario"))
+        ruta = os.path.join(user_dir, archivo_sel)
         guardar_poligonos(data["datos"], ruta)
         return jsonify({"success": True, "mensaje": "✅ Cambios guardados correctamente."})
     except Exception as e:
         return jsonify({"success": False, "mensaje": f"❌ Error: {e}"})
 
+
 # === GUARDAR COMO ===
 @app.route("/guardar_como", methods=["POST"])
 def guardar_como():
-    global archivo_seleccionado
     try:
         contenido = request.get_json(force=True)
         datos = contenido.get("datos", [])
@@ -197,16 +231,18 @@ def guardar_como():
         if not nuevo_nombre.lower().endswith(".xlsx"):
             nuevo_nombre += ".xlsx"
 
-        ruta_nueva = os.path.join(ruta_usuario_actual(), nuevo_nombre)
+        user_dir = get_user_dir(session.get("usuario"))
+        ruta_nueva = os.path.join(user_dir, nuevo_nombre)
         guardar_poligonos(datos, ruta_nueva)
-        archivo_seleccionado = nuevo_nombre
+
+        # No seleccionamos automáticamente; el usuario podrá abrirlo desde /inicio
         return jsonify({"success": True, "mensaje": f"✅ Archivo guardado como '{nuevo_nombre}' correctamente."})
     except Exception as e:
         return jsonify({"success": False, "mensaje": f"❌ Error al guardar: {e}"})
+
 
 # === EJECUCIÓN ===
 if __name__ == "__main__":
     import os
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port, debug=False)
-
