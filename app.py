@@ -75,24 +75,91 @@ def subir_a_drive(usuario, ruta_local):
 app = Flask(__name__)
 app.secret_key = "BanfiClaveSegura123"
 
+# === CONFIGURACIÓN AUTOMÁTICA SEGÚN ENTORNO ===
+def es_render():
+    """Detecta si el sistema está corriendo en Render (entorno en la nube)."""
+    return os.environ.get("RENDER", "") != "" or "render.com" in os.environ.get("HOSTNAME", "").lower()
 
-# === CONFIGURACIÓN: carpetas ===
-ruta_actual = os.getcwd().upper()
 
-if "C:\\MAPPEAR" in ruta_actual:
-    BASE_DIR = r"C:\MAppEAR\data"
-    SUBIR_A_DRIVE = False   # 🔴 No usar Drive en entorno local
-elif "F:\\MAPPEAR" in ruta_actual:
-    BASE_DIR = r"F:\MAPPEAR\data"
-    SUBIR_A_DRIVE = False   # 🔴 No usar Drive en entorno local
+if es_render():
+    # ☁️ MODO RENDER (usa Google Drive)
+    BASE_DIR = "/data"  # Carpeta temporal para manejo interno
+    SUBIR_A_DRIVE = True
+    USAR_DRIVE_COMO_FUENTE = True
 else:
-    BASE_DIR = os.path.join(os.getcwd(), "data")
-    SUBIR_A_DRIVE = True    # ✅ En la nube sí se usa Drive
+    # 🖥️ MODO LOCAL (usa carpetas del equipo)
+    if os.path.exists(r"C:\MAPPEAR"):
+        BASE_DIR = r"C:\MAPPEAR\data"
+    elif os.path.exists(r"F:\MAPPEAR"):
+        BASE_DIR = r"F:\MAPPEAR\data"
+    else:
+        BASE_DIR = os.path.join(os.getcwd(), "data")
+    SUBIR_A_DRIVE = False
+    USAR_DRIVE_COMO_FUENTE = False
 
 os.makedirs(BASE_DIR, exist_ok=True)
 print(f"📂 Carpeta de trabajo: {BASE_DIR}")
 print(f"☁️ Subida a Drive habilitada: {SUBIR_A_DRIVE}")
+print(f"📥 Lectura desde Drive habilitada: {USAR_DRIVE_COMO_FUENTE}")
 
+
+# === FUNCIONES DE DESCARGA DESDE GOOGLE DRIVE (solo Render) ===
+def descargar_de_drive(usuario, nombre_archivo):
+    """Descarga un archivo XLSX del usuario desde Google Drive al directorio temporal."""
+    try:
+        service = obtener_servicio_drive()
+        carpeta_nombre = usuario
+        q = f"name='{carpeta_nombre}' and mimeType='application/vnd.google-apps.folder' and '{ROOT_FOLDER_ID}' in parents"
+        result = service.files().list(q=q, fields="files(id, name)").execute()
+        items = result.get('files', [])
+        if not items:
+            print(f"⚠️ Carpeta del usuario '{usuario}' no encontrada en Drive.")
+            return None
+        folder_id = items[0]['id']
+
+        # Buscar archivo dentro de la carpeta
+        q = f"name='{nombre_archivo}' and '{folder_id}' in parents"
+        result = service.files().list(q=q, fields="files(id, name)").execute()
+        archivos = result.get('files', [])
+        if not archivos:
+            print(f"⚠️ Archivo '{nombre_archivo}' no encontrado en la carpeta de {usuario}.")
+            return None
+
+        file_id = archivos[0]['id']
+        request = service.files().get_media(fileId=file_id)
+        ruta_local = os.path.join(BASE_DIR, nombre_archivo)
+        with open(ruta_local, "wb") as f:
+            downloader = build('drive', 'v3', credentials=obtener_servicio_drive()._http.credentials)
+            response = service._http.request(f"https://www.googleapis.com/drive/v3/files/{file_id}?alt=media")
+            f.write(response[1])
+        print(f"⬇️ Archivo '{nombre_archivo}' descargado de Drive.")
+        return ruta_local
+    except Exception as e:
+        print(f"❌ Error al descargar de Drive: {e}")
+        return None
+
+
+# === FUNCIÓN PARA OBTENER ARCHIVOS DEL USUARIO ===
+def obtener_archivos(user_dir, usuario=None):
+    """Devuelve lista de archivos disponibles (local o desde Drive)."""
+    if USAR_DRIVE_COMO_FUENTE and usuario:
+        try:
+            service = obtener_servicio_drive()
+            q = f"mimeType='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' and trashed=false and '{ROOT_FOLDER_ID}' in parents"
+            q = f"'{ROOT_FOLDER_ID}' in parents and mimeType='application/vnd.google-apps.folder' and name='{usuario}'"
+            carpeta = service.files().list(q=q, fields="files(id, name)").execute()
+            if carpeta.get("files"):
+                folder_id = carpeta["files"][0]["id"]
+                q = f"'{folder_id}' in parents and mimeType='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'"
+                archivos = service.files().list(q=q, fields="files(name)").execute().get("files", [])
+                return sorted([f["name"] for f in archivos])
+        except Exception as e:
+            print(f"⚠️ No se pudo listar archivos desde Drive: {e}")
+            return []
+    else:
+        if not user_dir or not os.path.exists(user_dir):
+            return []
+        return sorted([f for f in os.listdir(user_dir) if f.endswith(".xlsx")])
 
 # === USUARIOS Y ROLES ===
 USERS = {
