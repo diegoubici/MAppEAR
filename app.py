@@ -2,30 +2,99 @@ import os
 import pandas as pd
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session
 
+# === GOOGLE DRIVE API ===
+import pickle
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaFileUpload
+from google_auth_oauthlib.flow import InstalledAppFlow
+from google.auth.transport.requests import Request
+
+SCOPES = ['https://www.googleapis.com/auth/drive.file']
+ROOT_FOLDER_ID = "1wP71l2KGx7IccvNex4HXUM0t2-NlneVn"  # Carpeta raíz en Drive
+
+
+# === FUNCIONES DE GOOGLE DRIVE ===
+def obtener_servicio_drive():
+    """Crea o usa las credenciales almacenadas para acceder a Drive."""
+    creds = None
+    if os.path.exists('token.json'):
+        with open('token.json', 'rb') as token:
+            creds = pickle.load(token)
+    if not creds or not creds.valid:
+        if creds and creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+        else:
+            flow = InstalledAppFlow.from_client_secrets_file('credentials.json', SCOPES)
+            creds = flow.run_local_server(port=0)
+        with open('token.json', 'wb') as token:
+            pickle.dump(creds, token)
+    return build('drive', 'v3', credentials=creds)
+
+
+def subir_a_drive(usuario, ruta_local):
+    """Sube o reemplaza un archivo XLSX en una carpeta del usuario en Drive."""
+    service = obtener_servicio_drive()
+    carpeta_nombre = usuario
+
+    # Buscar o crear carpeta del usuario
+    q = f"name='{carpeta_nombre}' and mimeType='application/vnd.google-apps.folder' and '{ROOT_FOLDER_ID}' in parents"
+    result = service.files().list(q=q, fields="files(id, name)").execute()
+    items = result.get('files', [])
+    if not items:
+        folder_metadata = {
+            'name': carpeta_nombre,
+            'mimeType': 'application/vnd.google-apps.folder',
+            'parents': [ROOT_FOLDER_ID]
+        }
+        folder = service.files().create(body=folder_metadata, fields='id').execute()
+        folder_id = folder['id']
+    else:
+        folder_id = items[0]['id']
+
+    # Subir o reemplazar el archivo
+    nombre_archivo = os.path.basename(ruta_local)
+    q = f"name='{nombre_archivo}' and '{folder_id}' in parents"
+    result = service.files().list(q=q, fields="files(id, name)").execute()
+    items = result.get('files', [])
+    media = MediaFileUpload(
+        ruta_local,
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        resumable=True
+    )
+    if items:
+        file_id = items[0]['id']
+        service.files().update(fileId=file_id, media_body=media).execute()
+    else:
+        metadata = {'name': nombre_archivo, 'parents': [folder_id]}
+        service.files().create(body=metadata, media_body=media, fields='id').execute()
+
+    print(f"✅ Archivo '{nombre_archivo}' subido a la carpeta '{carpeta_nombre}' en Drive.")
+
+
+# === FLASK APP ===
 app = Flask(__name__)
 app.secret_key = "BanfiClaveSegura123"
 
-# === CONFIGURACIÓN: base de datos / carpetas ===
-# Si existe la ruta local F:\MAPPEAR\data se usa (desarrollo local).
-# Si no existe, se usa una carpeta "data" dentro del proyecto (entorno remoto, p.e. Render).
-if os.path.exists(r"F:\MAPPEAR\data"):
+
+# === CONFIGURACIÓN: carpetas ===
+ruta_actual = os.getcwd().upper()
+
+if "C:\\MAPPEAR" in ruta_actual:
+    BASE_DIR = r"C:\MAppEAR\data"
+    SUBIR_A_DRIVE = False   # 🔴 No usar Drive en entorno local
+elif "F:\\MAPPEAR" in ruta_actual:
     BASE_DIR = r"F:\MAPPEAR\data"
+    SUBIR_A_DRIVE = False   # 🔴 No usar Drive en entorno local
 else:
     BASE_DIR = os.path.join(os.getcwd(), "data")
+    SUBIR_A_DRIVE = True    # ✅ En la nube sí se usa Drive
 
 os.makedirs(BASE_DIR, exist_ok=True)
+print(f"📂 Carpeta de trabajo: {BASE_DIR}")
+print(f"☁️ Subida a Drive habilitada: {SUBIR_A_DRIVE}")
 
 
-def get_user_dir(username):
-    """Devuelve la carpeta específica del usuario dentro de BASE_DIR (la crea si no existe)."""
-    if not username:
-        return None
-    user_dir = os.path.join(BASE_DIR, username)
-    os.makedirs(user_dir, exist_ok=True)
-    return user_dir
-
-
-# Usuarios y roles
+# === USUARIOS Y ROLES ===
 USERS = {
     "DSUBICI": {"password": "Banfi138", "rol": "admin"},
     "usuario1": {"password": "contraseña1", "rol": "user"},
@@ -37,8 +106,15 @@ USERS = {
 
 
 # === FUNCIONES AUXILIARES ===
+def get_user_dir(username):
+    if not username:
+        return None
+    user_dir = os.path.join(BASE_DIR, username)
+    os.makedirs(user_dir, exist_ok=True)
+    return user_dir
+
+
 def obtener_archivos(user_dir):
-    """Lista archivos .xlsx en la carpeta del usuario (user_dir)."""
     if not user_dir or not os.path.exists(user_dir):
         return []
     return sorted([f for f in os.listdir(user_dir) if f.endswith(".xlsx")])
@@ -50,7 +126,6 @@ def cargar_poligonos(ruta_archivo):
     for col in columnas:
         if col not in df.columns:
             df[col] = ""
-
     poligonos = []
     for _, fila in df.iterrows():
         coords = []
@@ -62,7 +137,6 @@ def cargar_poligonos(ruta_archivo):
                     coords.append([lat, lon])
             except Exception:
                 coords = []
-
         poligonos.append({
             "name": str(fila["NOMBRE"]),
             "superficie": str(fila["SUPERFICIE"]),
@@ -75,7 +149,6 @@ def cargar_poligonos(ruta_archivo):
             "coords": coords,
             "COORDENADAS": str(fila["COORDENADAS"]) if pd.notna(fila["COORDENADAS"]) else ""
         })
-
     return poligonos
 
 
@@ -90,33 +163,20 @@ def guardar_poligonos(nuevos_datos, ruta_destino):
                 df[col] = ""
 
     for i, dato in enumerate(nuevos_datos):
+        # ✅ Asegura que "COLOR HEX" se guarde bien (si el frontend usa "color")
+        if "COLOR HEX" not in dato and "color" in dato:
+            dato["COLOR HEX"] = dato["color"]
+
         if i < len(df):
-            df.at[i, "NOMBRE"] = dato.get("name", "")
-            df.at[i, "SUPERFICIE"] = dato.get("superficie", "")
-            df.at[i, "STATUS"] = dato.get("status", "")
-            df.at[i, "STATUS1"] = dato.get("status1", "")
-            df.at[i, "STATUS2"] = dato.get("status2", "")
-            df.at[i, "STATUS3"] = dato.get("status3", "")
-            df.at[i, "PARTIDO"] = dato.get("partido", "")
-            df.at[i, "COLOR HEX"] = dato.get("color", "")
-            df.at[i, "COORDENADAS"] = dato.get("COORDENADAS", "")
+            for col in columnas:
+                df.at[i, col] = dato.get(col, dato.get(col.lower(), ""))
         else:
-            df.loc[i] = [
-                dato.get("name", ""),
-                dato.get("superficie", ""),
-                dato.get("status", ""),
-                dato.get("status1", ""),
-                dato.get("status2", ""),
-                dato.get("status3", ""),
-                dato.get("partido", ""),
-                dato.get("color", ""),
-                dato.get("COORDENADAS", "")
-            ]
+            df.loc[i] = [dato.get(col, dato.get(col.lower(), "")) for col in columnas]
 
     df.to_excel(ruta_destino, index=False)
 
 
-# === LOGIN ===
+# === RUTAS FLASK ===
 @app.route("/", methods=["GET"])
 def login_page():
     return render_template("login.html")
@@ -130,10 +190,8 @@ def login():
     if user and user["password"] == password:
         session["usuario"] = username
         session["rol"] = user["rol"]
-        # Al loguearse vamos directamente a la pantalla de selección de archivos
         return redirect(url_for("seleccionar_archivo"))
-    else:
-        return render_template("login.html", error="Usuario o contraseña incorrectos.")
+    return render_template("login.html", error="Usuario o contraseña incorrectos.")
 
 
 @app.route("/logout")
@@ -142,39 +200,31 @@ def logout():
     return redirect("https://www.google.com.ar")
 
 
-# === SELECCIONAR ARCHIVO ===
 @app.route("/inicio")
 def seleccionar_archivo():
     if "usuario" not in session:
         return redirect(url_for("login_page"))
-
     user_dir = get_user_dir(session["usuario"])
     archivos = obtener_archivos(user_dir)
     return render_template("seleccionar_archivo.html", archivos=archivos,
                            usuario=session["usuario"], rol=session["rol"])
 
 
-# === ABRIR ARCHIVO ===
 @app.route("/abrir/<nombre>")
 def abrir_archivo(nombre):
     if "usuario" not in session:
         return redirect(url_for("login_page"))
-
     user_dir = get_user_dir(session["usuario"])
     archivos = obtener_archivos(user_dir)
     if nombre not in archivos:
         return "Archivo no encontrado", 404
-
-    # Guardar la selección en la sesión (por usuario)
     session['archivo_seleccionado'] = nombre
-
     ruta = os.path.join(user_dir, nombre)
     poligonos = cargar_poligonos(ruta)
     return render_template("mapa.html", usuario=session["usuario"],
                            rol=session["rol"], poligonos=poligonos)
 
 
-# === NUEVO ARCHIVO ===
 @app.route("/nuevo_archivo", methods=["POST"])
 def nuevo_archivo():
     nombre = request.form.get("nombre")
@@ -182,60 +232,57 @@ def nuevo_archivo():
         return jsonify({"success": False, "mensaje": "Nombre inválido."})
     if not nombre.lower().endswith(".xlsx"):
         nombre += ".xlsx"
-
     user_dir = get_user_dir(session.get("usuario"))
     if not user_dir:
         return jsonify({"success": False, "mensaje": "Usuario no logueado."})
-
     ruta_nueva = os.path.join(user_dir, nombre)
     if os.path.exists(ruta_nueva):
         return jsonify({"success": False, "mensaje": "El archivo ya existe."})
-
     df = pd.DataFrame(columns=["NOMBRE", "SUPERFICIE", "STATUS", "STATUS1", "STATUS2", "STATUS3", "PARTIDO", "COLOR HEX", "COORDENADAS"])
     df.to_excel(ruta_nueva, index=False)
-
-    # No seleccionamos automáticamente el archivo nuevo para forzar que el usuario lo abra desde /inicio
     return jsonify({"success": True, "archivo": nombre})
 
 
-# === GUARDAR ===
 @app.route("/guardar", methods=["POST"])
 def guardar():
     archivo_sel = session.get('archivo_seleccionado')
     if not archivo_sel:
-        return jsonify({"success": False, "mensaje": "No hay archivo seleccionado. Elegí uno en la pantalla de inicio."})
+        return jsonify({"success": False, "mensaje": "No hay archivo seleccionado."})
     try:
         data = request.get_json(force=True)
         if not data or "datos" not in data:
             return jsonify({"success": False, "mensaje": "Datos inválidos."})
-
         user_dir = get_user_dir(session.get("usuario"))
         ruta = os.path.join(user_dir, archivo_sel)
         guardar_poligonos(data["datos"], ruta)
+
+        # 🔄 Subir a Drive solo si está habilitado
+        if SUBIR_A_DRIVE:
+            subir_a_drive(session.get("usuario"), ruta)
+
         return jsonify({"success": True, "mensaje": "✅ Cambios guardados correctamente."})
     except Exception as e:
         return jsonify({"success": False, "mensaje": f"❌ Error: {e}"})
 
 
-# === GUARDAR COMO ===
 @app.route("/guardar_como", methods=["POST"])
 def guardar_como():
     try:
         contenido = request.get_json(force=True)
         datos = contenido.get("datos", [])
         nuevo_nombre = contenido.get("nuevo_nombre", "").strip()
-
         if not nuevo_nombre:
             return jsonify({"success": False, "mensaje": "⚠️ No se indicó nombre para guardar."})
-
         if not nuevo_nombre.lower().endswith(".xlsx"):
             nuevo_nombre += ".xlsx"
-
         user_dir = get_user_dir(session.get("usuario"))
         ruta_nueva = os.path.join(user_dir, nuevo_nombre)
         guardar_poligonos(datos, ruta_nueva)
 
-        # No seleccionamos automáticamente; el usuario podrá abrirlo desde /inicio
+        # 🔄 Subir a Drive solo si está habilitado
+        if SUBIR_A_DRIVE:
+            subir_a_drive(session.get("usuario"), ruta_nueva)
+
         return jsonify({"success": True, "mensaje": f"✅ Archivo guardado como '{nuevo_nombre}' correctamente."})
     except Exception as e:
         return jsonify({"success": False, "mensaje": f"❌ Error al guardar: {e}"})
@@ -243,6 +290,5 @@ def guardar_como():
 
 # === EJECUCIÓN ===
 if __name__ == "__main__":
-    import os
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port, debug=False)
