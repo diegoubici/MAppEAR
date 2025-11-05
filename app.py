@@ -25,7 +25,11 @@ def obtener_servicio_drive():
             creds.refresh(Request())
         else:
             flow = InstalledAppFlow.from_client_secrets_file('credentials.json', SCOPES)
-            creds = flow.run_local_server(port=0)
+
+            # 🔧 CAMBIO: se usa run_console() en lugar de run_local_server()
+            # Esto evita el error "could not locate runnable browser" en Render
+            creds = flow.run_console()
+
         with open('token.json', 'wb') as token:
             pickle.dump(creds, token)
     return build('drive', 'v3', credentials=creds)
@@ -126,10 +130,9 @@ def descargar_de_drive(usuario, nombre_archivo):
             return None
 
         file_id = archivos[0]['id']
-        request = service.files().get_media(fileId=file_id)
         ruta_local = os.path.join(BASE_DIR, nombre_archivo)
+        request = service.files().get_media(fileId=file_id)
         with open(ruta_local, "wb") as f:
-            downloader = build('drive', 'v3', credentials=obtener_servicio_drive()._http.credentials)
             response = service._http.request(f"https://www.googleapis.com/drive/v3/files/{file_id}?alt=media")
             f.write(response[1])
         print(f"⬇️ Archivo '{nombre_archivo}' descargado de Drive.")
@@ -138,28 +141,6 @@ def descargar_de_drive(usuario, nombre_archivo):
         print(f"❌ Error al descargar de Drive: {e}")
         return None
 
-
-# === FUNCIÓN PARA OBTENER ARCHIVOS DEL USUARIO ===
-def obtener_archivos(user_dir, usuario=None):
-    """Devuelve lista de archivos disponibles (local o desde Drive)."""
-    if USAR_DRIVE_COMO_FUENTE and usuario:
-        try:
-            service = obtener_servicio_drive()
-            q = f"mimeType='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' and trashed=false and '{ROOT_FOLDER_ID}' in parents"
-            q = f"'{ROOT_FOLDER_ID}' in parents and mimeType='application/vnd.google-apps.folder' and name='{usuario}'"
-            carpeta = service.files().list(q=q, fields="files(id, name)").execute()
-            if carpeta.get("files"):
-                folder_id = carpeta["files"][0]["id"]
-                q = f"'{folder_id}' in parents and mimeType='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'"
-                archivos = service.files().list(q=q, fields="files(name)").execute().get("files", [])
-                return sorted([f["name"] for f in archivos])
-        except Exception as e:
-            print(f"⚠️ No se pudo listar archivos desde Drive: {e}")
-            return []
-    else:
-        if not user_dir or not os.path.exists(user_dir):
-            return []
-        return sorted([f for f in os.listdir(user_dir) if f.endswith(".xlsx")])
 
 # === USUARIOS Y ROLES ===
 USERS = {
@@ -230,7 +211,6 @@ def guardar_poligonos(nuevos_datos, ruta_destino):
                 df[col] = ""
 
     for i, dato in enumerate(nuevos_datos):
-        # ✅ Asegura que "COLOR HEX" se guarde bien (si el frontend usa "color")
         if "COLOR HEX" not in dato and "color" in dato:
             dato["COLOR HEX"] = dato["color"]
 
@@ -359,3 +339,4 @@ def guardar_como():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port, debug=False)
+
