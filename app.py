@@ -260,26 +260,43 @@ def seleccionar_archivo():
     if USAR_DRIVE_COMO_FUENTE:
         try:
             service = obtener_servicio_drive()
-            q = f"name='{user}' and mimeType='application/vnd.google-apps.folder' and '{ROOT_FOLDER_ID}' in parents"
+
+            # Buscar carpeta del usuario dentro de la carpeta raíz MAppEARUPLOADS
+            q = f"mimeType='application/vnd.google-apps.folder' and '{ROOT_FOLDER_ID}' in parents and trashed=false"
             result = service.files().list(q=q, fields="files(id, name)").execute()
-            items = result.get('files', [])
-            if items:
-                folder_id = items[0]['id']
+            folders = result.get("files", [])
+            folder_id = None
+
+            for f in folders:
+                if f["name"].strip().lower() == user.strip().lower():
+                    folder_id = f["id"]
+                    break
+
+            if not folder_id:
+                print(f"⚠️ No se encontró carpeta del usuario '{user}' dentro de MAppEARUPLOADS en Drive.")
+            else:
+                # Descargar todos los .xlsx de esa carpeta
                 q = f"'{folder_id}' in parents and mimeType!='application/vnd.google-apps.folder' and trashed=false"
-                files = service.files().list(q=q, fields="files(id, name)").execute().get('files', [])
+                files = service.files().list(q=q, fields="files(id, name)").execute().get("files", [])
+                os.makedirs(user_dir, exist_ok=True)
                 for f in files:
                     if f["name"].lower().endswith(".xlsx"):
                         file_id = f["id"]
                         ruta_local = os.path.join(user_dir, f["name"])
+                        print(f"⬇️ Descargando {f['name']} desde Drive (carpeta {user})...")
                         request = service.files().get_media(fileId=file_id)
-                        with open(ruta_local, "wb") as archivo:
-                            response = service._http.request(
-                                f"https://www.googleapis.com/drive/v3/files/{file_id}?alt=media"
-                            )
-                            archivo.write(response[1])
-                print(f"⬇️ Todos los archivos XLSX del usuario {user} descargados desde Drive.")
+                        from googleapiclient.http import MediaIoBaseDownload
+                        import io
+                        fh = io.FileIO(ruta_local, "wb")
+                        downloader = MediaIoBaseDownload(fh, request)
+                        done = False
+                        while not done:
+                            status, done = downloader.next_chunk()
+                print(f"✅ Archivos XLSX del usuario {user} descargados en {user_dir}")
+
         except Exception as e:
             print(f"❌ Error descargando archivos desde Drive: {e}")
+
 
     archivos = obtener_archivos(user_dir)
     return render_template("seleccionar_archivo.html",
