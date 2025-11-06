@@ -252,10 +252,41 @@ def logout():
 def seleccionar_archivo():
     if "usuario" not in session:
         return redirect(url_for("login_page"))
-    user_dir = get_user_dir(session["usuario"])
+
+    user = session["usuario"]
+    user_dir = get_user_dir(user)
+
+    # 🔽 Si estamos en Render, descargar todos los XLSX del usuario desde Drive
+    if USAR_DRIVE_COMO_FUENTE:
+        try:
+            service = obtener_servicio_drive()
+            q = f"name='{user}' and mimeType='application/vnd.google-apps.folder' and '{ROOT_FOLDER_ID}' in parents"
+            result = service.files().list(q=q, fields="files(id, name)").execute()
+            items = result.get('files', [])
+            if items:
+                folder_id = items[0]['id']
+                q = f"'{folder_id}' in parents and mimeType!='application/vnd.google-apps.folder' and trashed=false"
+                files = service.files().list(q=q, fields="files(id, name)").execute().get('files', [])
+                for f in files:
+                    if f["name"].lower().endswith(".xlsx"):
+                        file_id = f["id"]
+                        ruta_local = os.path.join(user_dir, f["name"])
+                        request = service.files().get_media(fileId=file_id)
+                        with open(ruta_local, "wb") as archivo:
+                            response = service._http.request(
+                                f"https://www.googleapis.com/drive/v3/files/{file_id}?alt=media"
+                            )
+                            archivo.write(response[1])
+                print(f"⬇️ Todos los archivos XLSX del usuario {user} descargados desde Drive.")
+        except Exception as e:
+            print(f"❌ Error descargando archivos desde Drive: {e}")
+
     archivos = obtener_archivos(user_dir)
-    return render_template("seleccionar_archivo.html", archivos=archivos,
-                           usuario=session["usuario"], rol=session["rol"])
+    return render_template("seleccionar_archivo.html",
+                           archivos=archivos,
+                           usuario=user,
+                           rol=session["rol"])
+
 
 
 @app.route("/abrir/<nombre>")
