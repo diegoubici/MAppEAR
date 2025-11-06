@@ -262,15 +262,27 @@ def seleccionar_archivo():
 def abrir_archivo(nombre):
     if "usuario" not in session:
         return redirect(url_for("login_page"))
-    user_dir = get_user_dir(session["usuario"])
-    archivos = obtener_archivos(user_dir)
-    if nombre not in archivos:
-        return "Archivo no encontrado", 404
-    session['archivo_seleccionado'] = nombre
-    ruta = os.path.join(user_dir, nombre)
-    poligonos = cargar_poligonos(ruta)
-    return render_template("mapa.html", usuario=session["usuario"],
-                           rol=session["rol"], poligonos=poligonos)
+
+    user = session["usuario"]
+    user_dir = get_user_dir(user)
+    ruta_local = os.path.join(user_dir, nombre)
+
+    # 🔽 Si estamos en Render, descargamos el archivo desde Drive
+    if USAR_DRIVE_COMO_FUENTE:
+        descargado = descargar_de_drive(user, nombre)
+        if descargado:
+            ruta_local = descargado
+        else:
+            return f"❌ No se pudo descargar '{nombre}' desde Google Drive.", 404
+
+    # Verificar existencia (por si falla la descarga)
+    if not os.path.exists(ruta_local):
+        return "Archivo no encontrado.", 404
+
+    session["archivo_seleccionado"] = nombre
+    poligonos = cargar_poligonos(ruta_local)
+    return render_template("mapa.html", usuario=user, rol=session["rol"], poligonos=poligonos)
+
 
 
 @app.route("/nuevo_archivo", methods=["POST"])
