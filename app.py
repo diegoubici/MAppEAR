@@ -7,6 +7,27 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload
 import io
 from google.oauth2 import service_account
+import json
+import tempfile
+
+# === CONFIGURACIÓN DE SERVICE ACCOUNT ===
+SERVICE_ACCOUNT_FILE = "service_account.json"
+
+# Si estamos en Render, crear el archivo temporal desde la variable de entorno
+if os.environ.get("GOOGLE_SERVICE_ACCOUNT"):
+    try:
+        creds_json = os.environ["GOOGLE_SERVICE_ACCOUNT"]
+
+        # Guardar el JSON completo en un archivo temporal en /tmp o en el directorio actual
+        with open(SERVICE_ACCOUNT_FILE, "w") as f:
+            f.write(creds_json)
+
+        print("✅ Archivo service_account.json creado temporalmente desde variable de entorno.")
+    except Exception as e:
+        print(f"❌ Error creando archivo de credenciales desde variable de entorno: {e}")
+else:
+    print("⚠️ Variable de entorno GOOGLE_SERVICE_ACCOUNT no encontrada. Se usará el archivo local si existe.")
+
 
 SCOPES = ['https://www.googleapis.com/auth/drive.file']
 ROOT_FOLDER_ID = "1wP71l2KGx7IccvNex4HXUM0t2-NlneVn"  # Carpeta raíz MappearUploads en Drive
