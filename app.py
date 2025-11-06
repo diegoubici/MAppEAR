@@ -87,7 +87,7 @@ def es_render():
 
 if es_render():
     # ☁️ MODO RENDER (usa Google Drive)
-    BASE_DIR = "/data"  # Carpeta temporal para manejo interno
+    BASE_DIR = "/tmp"  # ✅ /tmp es la única carpeta con permisos de escritura en Render
     SUBIR_A_DRIVE = True
     USAR_DRIVE_COMO_FUENTE = True
 else:
@@ -100,6 +100,7 @@ else:
         BASE_DIR = os.path.join(os.getcwd(), "data")
     SUBIR_A_DRIVE = False
     USAR_DRIVE_COMO_FUENTE = False
+
 
 os.makedirs(BASE_DIR, exist_ok=True)
 print(f"📂 Carpeta de trabajo: {BASE_DIR}")
