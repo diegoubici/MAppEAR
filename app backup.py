@@ -11,7 +11,7 @@ import json
 
 # === CONFIGURACIÓN DE SERVICE ACCOUNT ===
 SERVICE_ACCOUNT_FILE = "service_account.json"
-SCOPES = ['https://www.googleapis.com/auth/drive.file']
+SCOPES = ['https://www.googleapis.com/auth/drive']
 ROOT_FOLDER_ID = "1wP71l2KGx7IccvNex4HXUM0t2-NlneVn"  # Carpeta raíz MappearUploads
 
 # Si estamos en Render, se crea temporalmente el archivo de credenciales
