@@ -14,26 +14,45 @@ SERVICE_ACCOUNT_FILE = "service_account.json"
 SCOPES = ['https://www.googleapis.com/auth/drive']
 ROOT_FOLDER_ID = "1wP71l2KGx7IccvNex4HXUM0t2-NlneVn"  # Carpeta raíz MappearUploads
 
-# Si estamos en Render, se crea temporalmente el archivo de credenciales
-if os.environ.get("GOOGLE_SERVICE_ACCOUNT"):
-    try:
-        creds_json = os.environ["GOOGLE_SERVICE_ACCOUNT"]
-        with open(SERVICE_ACCOUNT_FILE, "w") as f:
-            f.write(creds_json)
-        print("✅ Archivo service_account.json creado temporalmente desde variable de entorno.")
-    except Exception as e:
-        print(f"❌ Error creando archivo de credenciales desde variable de entorno: {e}")
+# === DETECTAR MODO DE EJECUCIÓN ===
+def es_render():
+    return os.environ.get("RENDER", "") != "" or "render.com" in os.environ.get("HOSTNAME", "").lower()
+
+MODO_RENDER = es_render()
+
+if MODO_RENDER:
+    print("🌐 MODO: RENDER (usando Google Drive)")
+    BASE_DIR = "/tmp"
+    # Si estamos en Render, se crea temporalmente el archivo de credenciales
+    if os.environ.get("GOOGLE_SERVICE_ACCOUNT"):
+        try:
+            creds_json = os.environ["GOOGLE_SERVICE_ACCOUNT"]
+            with open(SERVICE_ACCOUNT_FILE, "w") as f:
+                f.write(creds_json)
+            print("✅ Archivo service_account.json creado temporalmente desde variable de entorno.")
+        except Exception as e:
+            print(f"❌ Error creando archivo de credenciales desde variable de entorno: {e}")
+    else:
+        print("⚠️ Variable de entorno GOOGLE_SERVICE_ACCOUNT no encontrada.")
 else:
-    print("⚠️ Variable de entorno GOOGLE_SERVICE_ACCOUNT no encontrada. Se usará el archivo local si existe.")
+    print("🖥️  MODO: LOCAL (usando carpetas locales)")
+    if os.path.exists(r"C:\MAPPEAR"):
+        BASE_DIR = r"C:\MAPPEAR\data"
+    elif os.path.exists(r"F:\MAPPEAR"):
+        BASE_DIR = r"F:\MAPPEAR\data"
+    else:
+        BASE_DIR = os.path.join(os.getcwd(), "data")
 
-# === DEBUGGING ===
-print(f"🔍 DEBUG: SERVICE_ACCOUNT_FILE existe: {os.path.exists(SERVICE_ACCOUNT_FILE)}")
-print(f"🔍 DEBUG: ROOT_FOLDER_ID configurado: {ROOT_FOLDER_ID}")
+os.makedirs(BASE_DIR, exist_ok=True)
+print(f"📁 BASE_DIR: {BASE_DIR}")
 
 
-# === FUNCIÓN DE AUTENTICACIÓN ===
+# === FUNCIÓN DE AUTENTICACIÓN (solo para RENDER) ===
 def obtener_servicio_drive():
     """Autentica con la API de Google Drive usando cuenta de servicio."""
+    if not MODO_RENDER:
+        return None
+    
     try:
         if os.path.exists(SERVICE_ACCOUNT_FILE):
             creds = service_account.Credentials.from_service_account_file(
@@ -53,7 +72,7 @@ def obtener_servicio_drive():
         return None
 
 
-# === FUNCIONES DE GOOGLE DRIVE ===
+# === FUNCIONES DE GOOGLE DRIVE (solo para RENDER) ===
 def buscar_carpeta_usuario(service, usuario):
     """Busca la carpeta del usuario dentro de MappearUploads."""
     try:
@@ -89,6 +108,32 @@ def crear_carpeta_usuario(service, usuario):
         return None
 
 
+# === FUNCIONES UNIFICADAS (LOCAL + RENDER) ===
+
+def listar_archivos(usuario):
+    """Lista los archivos XLSX del usuario (LOCAL o DRIVE según el modo)."""
+    if MODO_RENDER:
+        # MODO RENDER: usar Google Drive
+        return listar_archivos_drive(usuario)
+    else:
+        # MODO LOCAL: usar carpetas locales
+        return listar_archivos_local(usuario)
+
+
+def listar_archivos_local(usuario):
+    """Lista archivos XLSX en la carpeta local del usuario."""
+    try:
+        user_dir = os.path.join(BASE_DIR, usuario)
+        os.makedirs(user_dir, exist_ok=True)
+        
+        archivos = [f for f in os.listdir(user_dir) if f.lower().endswith(".xlsx")]
+        print(f"📄 Archivos locales encontrados para {usuario}: {archivos}")
+        return sorted(archivos)
+    except Exception as e:
+        print(f"❌ Error listando archivos locales: {e}")
+        return []
+
+
 def listar_archivos_drive(usuario):
     """Lista los archivos XLSX del usuario en Drive."""
     try:
@@ -102,11 +147,38 @@ def listar_archivos_drive(usuario):
         result = service.files().list(q=q, fields="files(id, name)").execute()
         archivos = result.get("files", [])
         archivos_xlsx = [f["name"] for f in archivos if f["name"].lower().endswith(".xlsx")]
-        print(f"📄 Archivos encontrados para {usuario}: {archivos_xlsx}")
+        print(f"📄 Archivos Drive encontrados para {usuario}: {archivos_xlsx}")
         return sorted(archivos_xlsx)
     except Exception as e:
         print(f"❌ Error listando archivos de Drive: {e}")
         return []
+
+
+def obtener_archivo(usuario, nombre_archivo):
+    """Obtiene la ruta del archivo (LOCAL o descarga de DRIVE según el modo)."""
+    if MODO_RENDER:
+        # MODO RENDER: descargar de Drive
+        return descargar_de_drive(usuario, nombre_archivo)
+    else:
+        # MODO LOCAL: ruta directa
+        return obtener_archivo_local(usuario, nombre_archivo)
+
+
+def obtener_archivo_local(usuario, nombre_archivo):
+    """Obtiene la ruta del archivo en el sistema local."""
+    try:
+        user_dir = os.path.join(BASE_DIR, usuario)
+        ruta_archivo = os.path.join(user_dir, nombre_archivo)
+        
+        if os.path.exists(ruta_archivo):
+            print(f"✅ Archivo local encontrado: {ruta_archivo}")
+            return ruta_archivo
+        else:
+            print(f"❌ Archivo local no encontrado: {ruta_archivo}")
+            return None
+    except Exception as e:
+        print(f"❌ Error obteniendo archivo local: {e}")
+        return None
 
 
 def descargar_de_drive(usuario, nombre_archivo):
@@ -126,21 +198,32 @@ def descargar_de_drive(usuario, nombre_archivo):
 
         file_id = archivos[0]['id']
         ruta_local = os.path.join(BASE_DIR, nombre_archivo)
-        request = service.files().get_media(fileId=file_id)
+        request_obj = service.files().get_media(fileId=file_id)
         with io.FileIO(ruta_local, "wb") as fh:
-            downloader = MediaIoBaseDownload(fh, request)
+            downloader = MediaIoBaseDownload(fh, request_obj)
             done = False
             while not done:
                 _, done = downloader.next_chunk()
-        print(f"⬇️ Archivo '{nombre_archivo}' descargado correctamente.")
+        print(f"⬇️ Archivo '{nombre_archivo}' descargado correctamente de Drive.")
         return ruta_local
     except Exception as e:
         print(f"❌ Error al descargar de Drive: {e}")
         return None
 
 
+def guardar_archivo(usuario, ruta_local):
+    """Guarda el archivo (LOCAL o sube a DRIVE según el modo)."""
+    if MODO_RENDER:
+        # MODO RENDER: subir a Drive
+        return subir_a_drive(usuario, ruta_local)
+    else:
+        # MODO LOCAL: ya está guardado en la carpeta correcta
+        print(f"✅ Archivo guardado localmente: {ruta_local}")
+        return True
+
+
 def subir_a_drive(usuario, ruta_local):
-    """Sube o reemplaza un archivo XLSX en la carpeta del usuario."""
+    """Sube o reemplaza un archivo XLSX en la carpeta del usuario en Drive."""
     try:
         service = obtener_servicio_drive()
         if not service:
@@ -176,23 +259,6 @@ def subir_a_drive(usuario, ruta_local):
 app = Flask(__name__)
 app.secret_key = "BanfiClaveSegura123"
 
-def es_render():
-    return os.environ.get("RENDER", "") != "" or "render.com" in os.environ.get("HOSTNAME", "").lower()
-
-
-if es_render():
-    BASE_DIR = "/tmp"
-else:
-    if os.path.exists(r"C:\MAPPEAR"):
-        BASE_DIR = r"C:\MAPPEAR\data"
-    elif os.path.exists(r"F:\MAPPEAR"):
-        BASE_DIR = r"F:\MAPPEAR\data"
-    else:
-        BASE_DIR = os.path.join(os.getcwd(), "data")
-
-os.makedirs(BASE_DIR, exist_ok=True)
-
-
 USERS = {
     "DSUBICI": {"password": "Banfi138", "rol": "admin"},
     "usuario1": {"password": "contraseña1", "rol": "user"},
@@ -201,21 +267,6 @@ USERS = {
     "usuario4": {"password": "contraseña4", "rol": "user"},
     "RIVADAVIA": {"password": "rivadavia5", "rol": "user"},
 }
-
-
-# === FUNCIONES AUXILIARES ===
-def get_user_dir(username):
-    if not username:
-        return None
-    user_dir = os.path.join(BASE_DIR, username)
-    os.makedirs(user_dir, exist_ok=True)
-    return user_dir
-
-
-def obtener_archivos(user_dir):
-    if not user_dir or not os.path.exists(user_dir):
-        return []
-    return sorted([f for f in os.listdir(user_dir) if f.endswith(".xlsx")])
 
 
 def cargar_poligonos(ruta_archivo):
@@ -299,7 +350,7 @@ def seleccionar_archivo():
     if "usuario" not in session:
         return redirect(url_for("login_page"))
     user = session["usuario"]
-    archivos = listar_archivos_drive(user)
+    archivos = listar_archivos(user)  # ← Usa función unificada
     return render_template("seleccionar_archivo.html", archivos=archivos, usuario=user, rol=session["rol"])
 
 
@@ -308,9 +359,9 @@ def abrir_archivo(nombre):
     if "usuario" not in session:
         return redirect(url_for("login_page"))
     user = session["usuario"]
-    ruta_local = descargar_de_drive(user, nombre)
+    ruta_local = obtener_archivo(user, nombre)  # ← Usa función unificada
     if not ruta_local:
-        return f"No se pudo descargar '{nombre}' desde Drive.", 404
+        return f"No se pudo obtener '{nombre}'.", 404
     session["archivo_seleccionado"] = nombre
     poligonos = cargar_poligonos(ruta_local)
     return render_template("mapa.html", usuario=user, rol=session["rol"], poligonos=poligonos)
@@ -324,9 +375,17 @@ def guardar():
     try:
         data = request.get_json(force=True)
         user = session.get("usuario")
-        ruta = os.path.join(BASE_DIR, archivo_sel)
+        
+        # Determinar ruta según el modo
+        if MODO_RENDER:
+            ruta = os.path.join(BASE_DIR, archivo_sel)
+        else:
+            user_dir = os.path.join(BASE_DIR, user)
+            os.makedirs(user_dir, exist_ok=True)
+            ruta = os.path.join(user_dir, archivo_sel)
+        
         guardar_poligonos(data["datos"], ruta)
-        subir_a_drive(user, ruta)
+        guardar_archivo(user, ruta)  # ← Usa función unificada
         return jsonify({"success": True, "mensaje": "✅ Cambios guardados correctamente."})
     except Exception as e:
         return jsonify({"success": False, "mensaje": f"❌ Error: {e}"})
@@ -343,9 +402,17 @@ def guardar_como():
         if not nuevo_nombre.lower().endswith(".xlsx"):
             nuevo_nombre += ".xlsx"
         user = session.get("usuario")
-        ruta_nueva = os.path.join(BASE_DIR, nuevo_nombre)
+        
+        # Determinar ruta según el modo
+        if MODO_RENDER:
+            ruta_nueva = os.path.join(BASE_DIR, nuevo_nombre)
+        else:
+            user_dir = os.path.join(BASE_DIR, user)
+            os.makedirs(user_dir, exist_ok=True)
+            ruta_nueva = os.path.join(user_dir, nuevo_nombre)
+        
         guardar_poligonos(datos, ruta_nueva)
-        subir_a_drive(user, ruta_nueva)
+        guardar_archivo(user, ruta_nueva)  # ← Usa función unificada
         return jsonify({"success": True, "mensaje": f"✅ Archivo guardado como '{nuevo_nombre}'."})
     except Exception as e:
         return jsonify({"success": False, "mensaje": f"❌ Error al guardar: {e}"})

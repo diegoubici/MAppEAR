@@ -1,0 +1,22 @@
+# Credenciales
+service_account.json
+*.json
+
+# Archivos de Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+
+# Archivos temporales
+*.log
+*.tmp
+.DS_Store
+Thumbs.db
+
+# Datos locales
+data/
+*.xlsx
