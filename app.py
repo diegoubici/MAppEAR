@@ -407,21 +407,38 @@ def guardar_como():
             return jsonify({"success": False, "mensaje": "⚠️ No se indicó nombre."})
         if not nuevo_nombre.lower().endswith(".xlsx"):
             nuevo_nombre += ".xlsx"
+
         user = session.get("usuario")
-        
-        # Determinar ruta según el modo
+
+        # === RUTA TEMPORAL LOCAL ===
         if MODO_RENDER:
             ruta_nueva = os.path.join(BASE_DIR, nuevo_nombre)
         else:
             user_dir = os.path.join(BASE_DIR, user)
             os.makedirs(user_dir, exist_ok=True)
             ruta_nueva = os.path.join(user_dir, nuevo_nombre)
-        
+
+        # === GUARDAR LOS DATOS EN UN EXCEL LOCAL TEMPORAL ===
         guardar_poligonos(datos, ruta_nueva)
-        guardar_archivo(user, ruta_nueva)  # ← Usa función unificada
-        return jsonify({"success": True, "mensaje": f"✅ Archivo guardado como '{nuevo_nombre}'."})
+
+        # === SUBIR O REEMPLAZAR EN GOOGLE DRIVE SI ESTAMOS EN RENDER ===
+        if MODO_RENDER:
+            exito = subir_a_drive(user, ruta_nueva)
+            if exito:
+                # eliminar copia temporal local
+                if os.path.exists(ruta_nueva):
+                    os.remove(ruta_nueva)
+                return jsonify({"success": True, "mensaje": f"✅ Archivo '{nuevo_nombre}' guardado en Google Drive."})
+            else:
+                return jsonify({"success": False, "mensaje": "❌ Error al subir a Google Drive."})
+        else:
+            # modo local normal
+            guardar_archivo(user, ruta_nueva)
+            return jsonify({"success": True, "mensaje": f"✅ Archivo guardado localmente como '{nuevo_nombre}'."})
+
     except Exception as e:
         return jsonify({"success": False, "mensaje": f"❌ Error al guardar: {e}"})
+
 
 
 if __name__ == "__main__":
