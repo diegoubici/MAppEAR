@@ -300,24 +300,30 @@ def cargar_poligonos(ruta_archivo):
         })
     return poligonos
 
-
 def guardar_poligonos(nuevos_datos, ruta_destino):
+    """
+    Guarda los datos actualizados en el archivo Excel con nombres de columna fijos
+    y en el orden correcto. Evita mezclas entre mayúsculas/minúsculas.
+    """
     columnas = ["NOMBRE", "SUPERFICIE", "STATUS", "STATUS1", "STATUS2", "STATUS3", "PARTIDO", "COLOR HEX", "COORDENADAS"]
-    if not os.path.exists(ruta_destino):
-        df = pd.DataFrame(columns=columnas)
-    else:
-        df = pd.read_excel(ruta_destino)
-        for col in columnas:
-            if col not in df.columns:
-                df[col] = ""
-    for i, dato in enumerate(nuevos_datos):
-        if "COLOR HEX" not in dato and "color" in dato:
-            dato["COLOR HEX"] = dato["color"]
-        if i < len(df):
-            for col in columnas:
-                df.at[i, col] = dato.get(col, dato.get(col.lower(), ""))
-        else:
-            df.loc[i] = [dato.get(col, dato.get(col.lower(), "")) for col in columnas]
+
+    # Crear DataFrame nuevo con los datos recibidos
+    df = pd.DataFrame([
+        {
+            "NOMBRE": dato.get("name", ""),
+            "SUPERFICIE": dato.get("superficie", ""),
+            "STATUS": dato.get("status", ""),
+            "STATUS1": dato.get("status1", ""),
+            "STATUS2": dato.get("status2", ""),
+            "STATUS3": dato.get("status3", ""),
+            "PARTIDO": dato.get("partido", ""),
+            "COLOR HEX": dato.get("color", "#CCCCCC"),
+            "COORDENADAS": dato.get("COORDENADAS", "")
+        }
+        for dato in nuevos_datos
+    ], columns=columnas)
+
+    # Guardar Excel
     df.to_excel(ruta_destino, index=False)
 
 
