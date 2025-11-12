@@ -224,34 +224,58 @@ def guardar_archivo(usuario, ruta_local):
 
 def subir_a_drive(usuario, ruta_local):
     """Sube o reemplaza un archivo XLSX en la carpeta del usuario en Drive."""
+    print(f"📤 [SUBIR_DRIVE] Usuario: {usuario}, Archivo: {ruta_local}")
     try:
+        # Verificar que el archivo existe antes de subir
+        if not os.path.exists(ruta_local):
+            print(f"❌ [SUBIR_DRIVE] Archivo no existe: {ruta_local}")
+            return False
+        
+        file_size = os.path.getsize(ruta_local)
+        print(f"📤 [SUBIR_DRIVE] Tamaño del archivo: {file_size} bytes")
+        
         service = obtener_servicio_drive()
         if not service:
+            print(f"❌ [SUBIR_DRIVE] No se pudo obtener servicio")
             return False
+        
         folder_id = buscar_carpeta_usuario(service, usuario)
         if not folder_id:
+            print(f"📁 [SUBIR_DRIVE] Carpeta no existe, creando...")
             folder_id = crear_carpeta_usuario(service, usuario)
             if not folder_id:
+                print(f"❌ [SUBIR_DRIVE] No se pudo crear carpeta")
                 return False
 
         nombre_archivo = os.path.basename(ruta_local)
+        print(f"📤 [SUBIR_DRIVE] Nombre del archivo: {nombre_archivo}")
+        
         q = f"name='{nombre_archivo}' and '{folder_id}' in parents and trashed=false"
         result = service.files().list(q=q, fields="files(id)").execute()
         archivos_existentes = result.get("files", [])
 
-        media = MediaFileUpload(ruta_local, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', resumable=True)
+        media = MediaFileUpload(
+            ruta_local, 
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 
+            resumable=True
+        )
 
         if archivos_existentes:
             file_id = archivos_existentes[0]['id']
+            print(f"🔁 [SUBIR_DRIVE] Actualizando archivo existente (ID: {file_id})")
             service.files().update(fileId=file_id, media_body=media).execute()
-            print(f"🔁 Archivo '{nombre_archivo}' actualizado en Drive.")
+            print(f"✅ [SUBIR_DRIVE] Archivo '{nombre_archivo}' actualizado en Drive")
         else:
+            print(f"📤 [SUBIR_DRIVE] Creando nuevo archivo")
             metadata = {'name': nombre_archivo, 'parents': [folder_id]}
             service.files().create(body=metadata, media_body=media, fields='id').execute()
-            print(f"✅ Archivo '{nombre_archivo}' subido a Drive.")
+            print(f"✅ [SUBIR_DRIVE] Archivo '{nombre_archivo}' subido a Drive")
+        
         return True
     except Exception as e:
-        print(f"❌ Error subiendo archivo a Drive: {e}")
+        print(f"❌ [SUBIR_DRIVE] Error: {e}")
+        import traceback
+        print(traceback.format_exc())
         return False
 
 
@@ -403,41 +427,88 @@ def guardar_como():
         contenido = request.get_json(force=True)
         datos = contenido.get("datos", [])
         nuevo_nombre = contenido.get("nuevo_nombre", "").strip()
+        
+        print(f"📝 [GUARDAR_COMO] Iniciando guardado como...")
+        print(f"📝 [GUARDAR_COMO] Nuevo nombre solicitado: {nuevo_nombre}")
+        print(f"📝 [GUARDAR_COMO] Cantidad de datos: {len(datos)}")
+        
         if not nuevo_nombre:
             return jsonify({"success": False, "mensaje": "⚠️ No se indicó nombre."})
+        
         if not nuevo_nombre.lower().endswith(".xlsx"):
             nuevo_nombre += ".xlsx"
-
+        
+        print(f"📝 [GUARDAR_COMO] Nombre final: {nuevo_nombre}")
+        
         user = session.get("usuario")
-
-        # === RUTA TEMPORAL LOCAL ===
+        print(f"📝 [GUARDAR_COMO] Usuario: {user}")
+        print(f"📝 [GUARDAR_COMO] Modo: {'RENDER' if MODO_RENDER else 'LOCAL'}")
+        
+        # === DETERMINAR RUTA SEGÚN MODO ===
         if MODO_RENDER:
+            # En Render: temporal en /tmp
             ruta_nueva = os.path.join(BASE_DIR, nuevo_nombre)
         else:
+            # En Local: carpeta del usuario
             user_dir = os.path.join(BASE_DIR, user)
             os.makedirs(user_dir, exist_ok=True)
             ruta_nueva = os.path.join(user_dir, nuevo_nombre)
-
-        # === GUARDAR LOS DATOS EN UN EXCEL LOCAL TEMPORAL ===
+        
+        print(f"📝 [GUARDAR_COMO] Ruta temporal: {ruta_nueva}")
+        
+        # === GUARDAR LOCALMENTE PRIMERO ===
         guardar_poligonos(datos, ruta_nueva)
-
-        # === SUBIR O REEMPLAZAR EN GOOGLE DRIVE SI ESTAMOS EN RENDER ===
+        
+        # Verificar que se guardó
+        if not os.path.exists(ruta_nueva):
+            print(f"❌ [GUARDAR_COMO] Error: archivo no se creó en {ruta_nueva}")
+            return jsonify({"success": False, "mensaje": "❌ Error: no se pudo crear el archivo local"})
+        
+        file_size = os.path.getsize(ruta_nueva)
+        print(f"✅ [GUARDAR_COMO] Archivo creado localmente: {file_size} bytes")
+        
+        # === SUBIR A DRIVE SI ESTAMOS EN RENDER ===
         if MODO_RENDER:
+            print(f"📤 [GUARDAR_COMO] Subiendo a Google Drive...")
             exito = subir_a_drive(user, ruta_nueva)
+            
             if exito:
-                # eliminar copia temporal local
-                if os.path.exists(ruta_nueva):
-                    os.remove(ruta_nueva)
-                return jsonify({"success": True, "mensaje": f"✅ Archivo '{nuevo_nombre}' guardado en Google Drive."})
+                print(f"✅ [GUARDAR_COMO] Archivo subido a Drive exitosamente")
+                
+                # Eliminar archivo temporal
+                try:
+                    if os.path.exists(ruta_nueva):
+                        os.remove(ruta_nueva)
+                        print(f"🗑️ [GUARDAR_COMO] Archivo temporal eliminado")
+                except Exception as e:
+                    print(f"⚠️ [GUARDAR_COMO] No se pudo eliminar temporal: {e}")
+                
+                return jsonify({
+                    "success": True, 
+                    "mensaje": f"✅ Archivo '{nuevo_nombre}' guardado en Google Drive correctamente."
+                })
             else:
-                return jsonify({"success": False, "mensaje": "❌ Error al subir a Google Drive."})
+                print(f"❌ [GUARDAR_COMO] Error al subir a Drive")
+                return jsonify({
+                    "success": False, 
+                    "mensaje": "❌ Error al subir el archivo a Google Drive. Revise los logs."
+                })
         else:
-            # modo local normal
-            guardar_archivo(user, ruta_nueva)
-            return jsonify({"success": True, "mensaje": f"✅ Archivo guardado localmente como '{nuevo_nombre}'."})
-
+            # Modo local: ya está guardado
+            print(f"✅ [GUARDAR_COMO] Archivo guardado localmente en: {ruta_nueva}")
+            return jsonify({
+                "success": True, 
+                "mensaje": f"✅ Archivo '{nuevo_nombre}' guardado localmente."
+            })
+    
     except Exception as e:
-        return jsonify({"success": False, "mensaje": f"❌ Error al guardar: {e}"})
+        print(f"❌ [GUARDAR_COMO] Excepción: {e}")
+        import traceback
+        print(traceback.format_exc())
+        return jsonify({
+            "success": False, 
+            "mensaje": f"❌ Error al guardar: {str(e)}"
+        })
 
 
 
