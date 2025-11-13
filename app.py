@@ -422,7 +422,7 @@ def guardar_como():
         
         # === DETERMINAR RUTA SEGÚN MODO ===
         if MODO_RENDER:
-            ruta_nueva = os.path.join(BASE_DIR, nuevo_nombre)
+            ruta_nueva = os.path.join(BASE_DIR, nuevo_nombre)  # ← CORRECTO
         else:
             user_dir = os.path.join(BASE_DIR, user)
             os.makedirs(user_dir, exist_ok=True)
@@ -483,97 +483,6 @@ def guardar_como():
             "success": False, 
             "mensaje": f"❌ Error al guardar: {str(e)}"
         })
-
-
-@app.route("/guardar_como", methods=["POST"])
-def guardar_como():
-    try:
-        contenido = request.get_json(force=True)
-        datos = contenido.get("datos", [])
-        nuevo_nombre = contenido.get("nuevo_nombre", "").strip()
-        
-        print(f"📝 [GUARDAR_COMO] Iniciando guardado como...")
-        print(f"📝 [GUARDAR_COMO] Nuevo nombre solicitado: {nuevo_nombre}")
-        print(f"📝 [GUARDAR_COMO] Cantidad de datos: {len(datos)}")
-        
-        if not nuevo_nombre:
-            return jsonify({"success": False, "mensaje": "⚠️ No se indicó nombre."})
-        
-        # Forzar extensión .xlsx
-        if not nuevo_nombre.lower().endswith(".xlsx"):
-            nuevo_nombre += ".xlsx"
-        
-        print(f"📝 [GUARDAR_COMO] Nombre final: {nuevo_nombre}")
-        
-        user = session.get("usuario")
-        print(f"📝 [GUARDAR_COMO] Usuario: {user}")
-        print(f"📝 [GUARDAR_COMO] Modo: {'RENDER' if MODO_RENDER else 'LOCAL'}")
-        
-        # === DETERMINAR RUTA SEGÚN MODO ===
-        if MODO_RENDER:
-            # En Render, usar carpeta temporal /tmp (no BASE_DIR)
-            ruta_nueva = os.path.join("/tmp", nuevo_nombre)
-        else:
-            # En modo local, guardar en carpeta del usuario
-            user_dir = os.path.join(BASE_DIR, user)
-            os.makedirs(user_dir, exist_ok=True)
-            ruta_nueva = os.path.join(user_dir, nuevo_nombre)
-        
-        print(f"📝 [GUARDAR_COMO] Ruta temporal: {ruta_nueva}")
-        
-        # === GUARDAR LOCALMENTE ===
-        guardar_poligonos(datos, ruta_nueva)
-        
-        # Verificar que se guardó
-        if not os.path.exists(ruta_nueva):
-            print(f"❌ [GUARDAR_COMO] Error: archivo no se creó en {ruta_nueva}")
-            return jsonify({"success": False, "mensaje": "❌ Error: no se pudo crear el archivo local"})
-        
-        file_size = os.path.getsize(ruta_nueva)
-        print(f"✅ [GUARDAR_COMO] Archivo creado localmente: {file_size} bytes")
-        
-        # === SUBIR A DRIVE EN RENDER ===
-        if MODO_RENDER:
-            print(f"📤 [GUARDAR_COMO] Subiendo a Google Drive...")
-            exito = subir_a_drive(user, ruta_nueva)
-            
-            if exito:
-                print(f"✅ [GUARDAR_COMO] Archivo subido a Drive exitosamente")
-                
-                # Eliminar archivo temporal
-                try:
-                    os.remove(ruta_nueva)
-                    print(f"🗑️ [GUARDAR_COMO] Archivo temporal eliminado")
-                except Exception as e:
-                    print(f"⚠️ [GUARDAR_COMO] No se pudo eliminar temporal: {e}")
-                
-                return jsonify({
-                    "success": True,
-                    "mensaje": f"✅ Archivo '{nuevo_nombre}' guardado en Google Drive correctamente."
-                })
-            else:
-                print(f"❌ [GUARDAR_COMO] Error al subir a Drive")
-                return jsonify({
-                    "success": False,
-                    "mensaje": "❌ Error al subir el archivo a Google Drive. Revise los logs."
-                })
-        else:
-            # Modo local
-            print(f"✅ [GUARDAR_COMO] Archivo guardado localmente en: {ruta_nueva}")
-            return jsonify({
-                "success": True,
-                "mensaje": f"✅ Archivo '{nuevo_nombre}' guardado localmente."
-            })
-    
-    except Exception as e:
-        print(f"❌ [GUARDAR_COMO] Excepción: {e}")
-        import traceback
-        print(traceback.format_exc())
-        return jsonify({
-            "success": False,
-            "mensaje": f"❌ Error al guardar: {str(e)}"
-        })
-
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
