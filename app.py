@@ -435,6 +435,7 @@ def guardar_como():
         if not nuevo_nombre:
             return jsonify({"success": False, "mensaje": "⚠️ No se indicó nombre."})
         
+        # Forzar extensión .xlsx
         if not nuevo_nombre.lower().endswith(".xlsx"):
             nuevo_nombre += ".xlsx"
         
@@ -446,17 +447,17 @@ def guardar_como():
         
         # === DETERMINAR RUTA SEGÚN MODO ===
         if MODO_RENDER:
-            # En Render: temporal en /tmp
-            ruta_nueva = os.path.join(BASE_DIR, nuevo_nombre)
+            # En Render, usar carpeta temporal /tmp (no BASE_DIR)
+            ruta_nueva = os.path.join("/tmp", nuevo_nombre)
         else:
-            # En Local: carpeta del usuario
+            # En modo local, guardar en carpeta del usuario
             user_dir = os.path.join(BASE_DIR, user)
             os.makedirs(user_dir, exist_ok=True)
             ruta_nueva = os.path.join(user_dir, nuevo_nombre)
         
         print(f"📝 [GUARDAR_COMO] Ruta temporal: {ruta_nueva}")
         
-        # === GUARDAR LOCALMENTE PRIMERO ===
+        # === GUARDAR LOCALMENTE ===
         guardar_poligonos(datos, ruta_nueva)
         
         # Verificar que se guardó
@@ -467,7 +468,7 @@ def guardar_como():
         file_size = os.path.getsize(ruta_nueva)
         print(f"✅ [GUARDAR_COMO] Archivo creado localmente: {file_size} bytes")
         
-        # === SUBIR A DRIVE SI ESTAMOS EN RENDER ===
+        # === SUBIR A DRIVE EN RENDER ===
         if MODO_RENDER:
             print(f"📤 [GUARDAR_COMO] Subiendo a Google Drive...")
             exito = subir_a_drive(user, ruta_nueva)
@@ -477,27 +478,26 @@ def guardar_como():
                 
                 # Eliminar archivo temporal
                 try:
-                    if os.path.exists(ruta_nueva):
-                        os.remove(ruta_nueva)
-                        print(f"🗑️ [GUARDAR_COMO] Archivo temporal eliminado")
+                    os.remove(ruta_nueva)
+                    print(f"🗑️ [GUARDAR_COMO] Archivo temporal eliminado")
                 except Exception as e:
                     print(f"⚠️ [GUARDAR_COMO] No se pudo eliminar temporal: {e}")
                 
                 return jsonify({
-                    "success": True, 
+                    "success": True,
                     "mensaje": f"✅ Archivo '{nuevo_nombre}' guardado en Google Drive correctamente."
                 })
             else:
                 print(f"❌ [GUARDAR_COMO] Error al subir a Drive")
                 return jsonify({
-                    "success": False, 
+                    "success": False,
                     "mensaje": "❌ Error al subir el archivo a Google Drive. Revise los logs."
                 })
         else:
-            # Modo local: ya está guardado
+            # Modo local
             print(f"✅ [GUARDAR_COMO] Archivo guardado localmente en: {ruta_nueva}")
             return jsonify({
-                "success": True, 
+                "success": True,
                 "mensaje": f"✅ Archivo '{nuevo_nombre}' guardado localmente."
             })
     
@@ -506,10 +506,9 @@ def guardar_como():
         import traceback
         print(traceback.format_exc())
         return jsonify({
-            "success": False, 
+            "success": False,
             "mensaje": f"❌ Error al guardar: {str(e)}"
         })
-
 
 
 if __name__ == "__main__":
