@@ -12,7 +12,7 @@ import json
 # === CONFIGURACIÓN DE SERVICE ACCOUNT ===
 SERVICE_ACCOUNT_FILE = "service_account.json"
 SCOPES = ['https://www.googleapis.com/auth/drive']
-ROOT_FOLDER_ID = "1iQQoycmFp3T1SANCLUffVYd_t3saW6Ny"  # Carpeta Drive correcta
+ROOT_FOLDER_ID = "1owQU7ef5s5jzY3w9Nj-DScziZnohaOrd"  # Carpeta Drive correcta
 
 # === DETECTAR MODO DE EJECUCIÓN ===
 def es_render():
