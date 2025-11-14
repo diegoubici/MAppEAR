@@ -1,7 +1,13 @@
-Flask 
-pandas 
-openpyxl 
-gunicorn 
+Flask
+pandas
+openpyxl
+gunicorn
+
+# Para Cloudflare R2
+boto3
+botocore
+
+# (Opcionales si seguís usando algo de Google pero ya NO deberías)
 google-auth
 google-auth-oauthlib
 google-auth-httplib2
