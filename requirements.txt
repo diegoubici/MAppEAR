@@ -1,14 +1,6 @@
-Flask
-pandas
-openpyxl
-gunicorn
+Flask==3.1.0
+pandas==2.2.3
+openpyxl==3.1.5
+boto3==1.35.0
+gunicorn==23.0.0
 
-# Para Cloudflare R2
-boto3
-botocore
-
-# (Opcionales si seguís usando algo de Google pero ya NO deberías)
-google-auth
-google-auth-oauthlib
-google-auth-httplib2
-google-api-python-client
