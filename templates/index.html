@@ -81,6 +81,15 @@
   .logout-btn:hover {
     background-color: #b52a37;
   }
+
+  /* Botón de subir archivo */
+  #btnSubir {
+    background-color: #28a745;
+  }
+
+  #btnSubir:hover {
+    background-color: #1d7f33;
+  }
 </style>
 </head>
 <body>
@@ -104,15 +113,50 @@
     <button type="submit">Crear y abrir</button>
   </form>
 
+  <div style="margin-top: 20px; text-align:center;">
+    {% if usuario == "DSUBICI" %}
+      <button id="btnSubir">Subir archivo a la carpeta</button>
+      <input type="file" id="archivoSubir" style="display:none;">
+    {% endif %}
+  </div>
+
   <div class="footer">
     <button class="logout-btn" id="logoutBtn">Cerrar sesión</button>
   </div>
 
 <script>
 document.getElementById("logoutBtn").addEventListener("click", async () => {
-    // Cierra solo la pestaña del navegador
     window.close();
 });
+
+{% if usuario == "DSUBICI" %}
+
+document.getElementById("btnSubir").addEventListener("click", () => {
+    document.getElementById("archivoSubir").click();
+});
+
+document.getElementById("archivoSubir").addEventListener("change", function () {
+    let file = this.files[0];
+    if (!file) return;
+
+    let formData = new FormData();
+    formData.append("archivo", file);
+
+    fetch("/subir_archivo", {
+        method: "POST",
+        body: formData
+    })
+    .then(r => r.json())
+    .then(resp => {
+        if (resp.ok) {
+            alert("Archivo subido correctamente");
+            location.reload();
+        } else {
+            alert("Error: " + resp.error);
+        }
+    });
+});
+{% endif %}
 </script>
 
 </body>

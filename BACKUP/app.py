@@ -1,39 +1,27 @@
 import os
 import pandas as pd
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session
+import boto3
+from io import BytesIO
 
-# === GOOGLE DRIVE API ===
-from googleapiclient.discovery import build
-from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload
-import io
-from google.oauth2 import service_account
-import json
+# === CLOUDFLARE R2 CONFIGURATION ===
+R2_ACCESS_KEY = os.getenv("R2_ACCESS_KEY")
+R2_SECRET_KEY = os.getenv("R2_SECRET_KEY")
+R2_BUCKET = os.getenv("R2_BUCKET")
+R2_ENDPOINT = os.getenv("R2_ENDPOINT")
 
-# === CONFIGURACIÓN DE SERVICE ACCOUNT ===
-SERVICE_ACCOUNT_FILE = "service_account.json"
-SCOPES = ['https://www.googleapis.com/auth/drive']
-ROOT_FOLDER_ID = "1wP71l2KGx7IccvNex4HXUM0t2-NlneVn"  # Carpeta raíz MappearUploads
+# Detectar si estamos en modo Render (con R2) o Local
+MODO_R2 = all([R2_ACCESS_KEY, R2_SECRET_KEY, R2_BUCKET, R2_ENDPOINT])
 
-# === DETECTAR MODO DE EJECUCIÓN ===
-def es_render():
-    return os.environ.get("RENDER", "") != "" or "render.com" in os.environ.get("HOSTNAME", "").lower()
-
-MODO_RENDER = es_render()
-
-if MODO_RENDER:
-    print("🌐 MODO: RENDER (usando Google Drive)")
+if MODO_R2:
+    print("🌐 MODO: RENDER/R2 (usando Cloudflare R2)")
+    r2_client = boto3.client(
+        "s3",
+        endpoint_url=R2_ENDPOINT,
+        aws_access_key_id=R2_ACCESS_KEY,
+        aws_secret_access_key=R2_SECRET_KEY
+    )
     BASE_DIR = "/tmp"
-    # Si estamos en Render, se crea temporalmente el archivo de credenciales
-    if os.environ.get("GOOGLE_SERVICE_ACCOUNT"):
-        try:
-            creds_json = os.environ["GOOGLE_SERVICE_ACCOUNT"]
-            with open(SERVICE_ACCOUNT_FILE, "w") as f:
-                f.write(creds_json)
-            print("✅ Archivo service_account.json creado temporalmente desde variable de entorno.")
-        except Exception as e:
-            print(f"❌ Error creando archivo de credenciales desde variable de entorno: {e}")
-    else:
-        print("⚠️ Variable de entorno GOOGLE_SERVICE_ACCOUNT no encontrada.")
 else:
     print("🖥️  MODO: LOCAL (usando carpetas locales)")
     if os.path.exists(r"C:\MAPPEAR"):
@@ -46,82 +34,82 @@ else:
 os.makedirs(BASE_DIR, exist_ok=True)
 print(f"📁 BASE_DIR: {BASE_DIR}")
 
+# === FLASK APP ===
+app = Flask(__name__)
+app.secret_key = "BanfiClaveSegura123"
 
-# === FUNCIÓN DE AUTENTICACIÓN (solo para RENDER) ===
-def obtener_servicio_drive():
-    """Autentica con la API de Google Drive usando cuenta de servicio."""
-    if not MODO_RENDER:
-        return None
-    
+USERS = {
+    "DSUBICI": {"password": "Banfi138", "rol": "admin"},
+    "usuario1": {"password": "contraseña1", "rol": "user"},
+    "usuario2": {"password": "contraseña2", "rol": "user"},
+    "usuario3": {"password": "contraseña3", "rol": "user"},
+    "usuario4": {"password": "contraseña4", "rol": "user"},
+    "RIVADAVIA": {"password": "rivadavia5", "rol": "user"},
+}
+
+# === FUNCIONES R2 ===
+def listar_archivos_r2(usuario):
+    """Lista archivos .xlsx del usuario en R2"""
     try:
-        if os.path.exists(SERVICE_ACCOUNT_FILE):
-            creds = service_account.Credentials.from_service_account_file(
-                SERVICE_ACCOUNT_FILE, scopes=SCOPES
+        prefix = f"{usuario}/"
+        response = r2_client.list_objects_v2(Bucket=R2_BUCKET, Prefix=prefix)
+        
+        archivos = []
+        if "Contents" in response:
+            for obj in response["Contents"]:
+                nombre = obj["Key"]
+                if nombre.lower().endswith(".xlsx") and "/" in nombre:
+                    archivos.append(nombre.split("/", 1)[1])  # Quitar prefijo usuario/
+        
+        print(f"📄 Archivos R2 encontrados para {usuario}: {archivos}")
+        return sorted(archivos)
+    except Exception as e:
+        print(f"❌ Error listando archivos R2: {e}")
+        return []
+
+
+def descargar_de_r2(usuario, nombre_archivo):
+    """Descarga archivo desde R2"""
+    try:
+        key = f"{usuario}/{nombre_archivo}"
+        response = r2_client.get_object(Bucket=R2_BUCKET, Key=key)
+        data = response["Body"].read()
+        
+        ruta_local = os.path.join(BASE_DIR, nombre_archivo)
+        with open(ruta_local, "wb") as f:
+            f.write(data)
+        
+        print(f"⬇️ Archivo '{nombre_archivo}' descargado de R2")
+        return ruta_local
+    except Exception as e:
+        print(f"❌ Error descargando de R2: {e}")
+        return None
+
+
+def subir_a_r2(usuario, ruta_local):
+    """Sube archivo a R2"""
+    try:
+        nombre_archivo = os.path.basename(ruta_local)
+        key = f"{usuario}/{nombre_archivo}"
+        
+        with open(ruta_local, "rb") as f:
+            r2_client.put_object(
+                Bucket=R2_BUCKET,
+                Key=key,
+                Body=f.read(),
+                ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
-        elif os.environ.get("GOOGLE_SERVICE_ACCOUNT"):
-            creds_info = json.loads(os.environ["GOOGLE_SERVICE_ACCOUNT"])
-            creds = service_account.Credentials.from_service_account_info(creds_info, scopes=SCOPES)
-        else:
-            raise FileNotFoundError("No se encontró el archivo service_account.json ni la variable de entorno.")
-
-        service = build('drive', 'v3', credentials=creds)
-        print("✅ Autenticado con Google Drive correctamente.")
-        return service
+        
+        print(f"✅ Archivo '{nombre_archivo}' subido a R2")
+        return True
     except Exception as e:
-        print(f"❌ Error al autenticar con la cuenta de servicio: {e}")
-        return None
+        print(f"❌ Error subiendo a R2: {e}")
+        return False
 
 
-# === FUNCIONES DE GOOGLE DRIVE (solo para RENDER) ===
-def buscar_carpeta_usuario(service, usuario):
-    """Busca la carpeta del usuario dentro de MappearUploads."""
-    try:
-        q = f"mimeType='application/vnd.google-apps.folder' and '{ROOT_FOLDER_ID}' in parents and trashed=false"
-        result = service.files().list(q=q, fields="files(id, name)").execute()
-        folders = result.get("files", [])
-        user_normalizado = usuario.strip().lower().replace(" ", "")
-        for folder in folders:
-            nombre_carpeta = folder["name"].strip().lower().replace(" ", "")
-            if nombre_carpeta == user_normalizado:
-                print(f"✅ Encontrada carpeta del usuario '{usuario}': {folder['name']} (ID: {folder['id']})")
-                return folder['id']
-        print(f"⚠️ No se encontró carpeta para el usuario '{usuario}'.")
-        return None
-    except Exception as e:
-        print(f"❌ Error buscando carpeta del usuario: {e}")
-        return None
-
-
-def crear_carpeta_usuario(service, usuario):
-    """Crea una carpeta para el usuario dentro de MappearUploads."""
-    try:
-        folder_metadata = {
-            'name': usuario,
-            'mimeType': 'application/vnd.google-apps.folder',
-            'parents': [ROOT_FOLDER_ID]
-        }
-        folder = service.files().create(body=folder_metadata, fields='id').execute()
-        print(f"✅ Carpeta creada para '{usuario}' (ID: {folder['id']})")
-        return folder['id']
-    except Exception as e:
-        print(f"❌ Error creando carpeta del usuario: {e}")
-        return None
-
-
-# === FUNCIONES UNIFICADAS (LOCAL + RENDER) ===
-
-def listar_archivos(usuario):
-    """Lista los archivos XLSX del usuario (LOCAL o DRIVE según el modo)."""
-    if MODO_RENDER:
-        # MODO RENDER: usar Google Drive
-        return listar_archivos_drive(usuario)
-    else:
-        # MODO LOCAL: usar carpetas locales
-        return listar_archivos_local(usuario)
-
-
+# === FUNCIONES LOCALES ===
 def listar_archivos_local(usuario):
-    """Lista archivos XLSX en la carpeta local del usuario."""
+    """Lista archivos en carpeta local"""
     try:
         user_dir = os.path.join(BASE_DIR, usuario)
         os.makedirs(user_dir, exist_ok=True)
@@ -134,38 +122,8 @@ def listar_archivos_local(usuario):
         return []
 
 
-def listar_archivos_drive(usuario):
-    """Lista los archivos XLSX del usuario en Drive."""
-    try:
-        service = obtener_servicio_drive()
-        if not service:
-            return []
-        folder_id = buscar_carpeta_usuario(service, usuario)
-        if not folder_id:
-            return []
-        q = f"'{folder_id}' in parents and mimeType!='application/vnd.google-apps.folder' and trashed=false"
-        result = service.files().list(q=q, fields="files(id, name)").execute()
-        archivos = result.get("files", [])
-        archivos_xlsx = [f["name"] for f in archivos if f["name"].lower().endswith(".xlsx")]
-        print(f"📄 Archivos Drive encontrados para {usuario}: {archivos_xlsx}")
-        return sorted(archivos_xlsx)
-    except Exception as e:
-        print(f"❌ Error listando archivos de Drive: {e}")
-        return []
-
-
-def obtener_archivo(usuario, nombre_archivo):
-    """Obtiene la ruta del archivo (LOCAL o descarga de DRIVE según el modo)."""
-    if MODO_RENDER:
-        # MODO RENDER: descargar de Drive
-        return descargar_de_drive(usuario, nombre_archivo)
-    else:
-        # MODO LOCAL: ruta directa
-        return obtener_archivo_local(usuario, nombre_archivo)
-
-
 def obtener_archivo_local(usuario, nombre_archivo):
-    """Obtiene la ruta del archivo en el sistema local."""
+    """Obtiene ruta de archivo local"""
     try:
         user_dir = os.path.join(BASE_DIR, usuario)
         ruta_archivo = os.path.join(user_dir, nombre_archivo)
@@ -181,100 +139,70 @@ def obtener_archivo_local(usuario, nombre_archivo):
         return None
 
 
-def descargar_de_drive(usuario, nombre_archivo):
-    """Descarga un archivo XLSX del usuario desde Google Drive."""
+# === FUNCIONES UNIFICADAS ===
+def listar_archivos_r2(usuario):
+    """Lista archivos .xlsx del usuario en R2"""
     try:
-        service = obtener_servicio_drive()
-        if not service:
-            return None
-        folder_id = buscar_carpeta_usuario(service, usuario)
-        if not folder_id:
-            return None
-        q = f"name='{nombre_archivo}' and '{folder_id}' in parents and trashed=false"
-        result = service.files().list(q=q, fields="files(id, name)").execute()
-        archivos = result.get('files', [])
-        if not archivos:
-            return None
-
-        file_id = archivos[0]['id']
-        ruta_local = os.path.join(BASE_DIR, nombre_archivo)
-        request_obj = service.files().get_media(fileId=file_id)
-        with io.FileIO(ruta_local, "wb") as fh:
-            downloader = MediaIoBaseDownload(fh, request_obj)
-            done = False
-            while not done:
-                _, done = downloader.next_chunk()
-        print(f"⬇️ Archivo '{nombre_archivo}' descargado correctamente de Drive.")
-        return ruta_local
+        if not all([R2_ACCESS_KEY, R2_SECRET_KEY, R2_BUCKET, R2_ENDPOINT]):
+            print("⚠️ Configuración R2 incompleta, usando lista vacía")
+            return []
+        
+        prefix = f"{usuario}/"
+        print(f"🔍 Listando archivos R2 con prefix: {prefix}")
+        
+        response = r2_client.list_objects_v2(Bucket=R2_BUCKET, Prefix=prefix)
+        
+        archivos = []
+        if "Contents" in response:
+            for obj in response["Contents"]:
+                nombre = obj["Key"]
+                # Solo archivos .xlsx, no carpetas vacías
+                if nombre.lower().endswith(".xlsx") and "/" in nombre:
+                    archivo_solo = nombre.split("/", 1)[1]  # Quitar prefijo usuario/
+                    if archivo_solo:  # No agregar strings vacíos
+                        archivos.append(archivo_solo)
+        
+        print(f"📄 Archivos R2 encontrados para {usuario}: {archivos}")
+        return sorted(archivos)
     except Exception as e:
-        print(f"❌ Error al descargar de Drive: {e}")
-        return None
+        print(f"❌ Error listando archivos R2: {e}")
+        import traceback
+        print(traceback.format_exc())
+        return []  # Retornar lista vacía en caso de error
+
+
+def obtener_archivo(usuario, nombre_archivo):
+    """Obtiene archivo (R2 o local según modo)"""
+    if MODO_R2:
+        return descargar_de_r2(usuario, nombre_archivo)
+    else:
+        return obtener_archivo_local(usuario, nombre_archivo)
 
 
 def guardar_archivo(usuario, ruta_local):
-    """Guarda el archivo (LOCAL o sube a DRIVE según el modo)."""
-    if MODO_RENDER:
-        # MODO RENDER: subir a Drive
-        return subir_a_drive(usuario, ruta_local)
+    """Guarda archivo (R2 o local según modo)"""
+    if MODO_R2:
+        return subir_a_r2(usuario, ruta_local)
     else:
-        # MODO LOCAL: ya está guardado en la carpeta correcta
         print(f"✅ Archivo guardado localmente: {ruta_local}")
         return True
 
-
-def subir_a_drive(usuario, ruta_local):
-    """Sube o reemplaza un archivo XLSX en la carpeta del usuario en Drive."""
-    try:
-        service = obtener_servicio_drive()
-        if not service:
-            return False
-        folder_id = buscar_carpeta_usuario(service, usuario)
-        if not folder_id:
-            folder_id = crear_carpeta_usuario(service, usuario)
-            if not folder_id:
-                return False
-
-        nombre_archivo = os.path.basename(ruta_local)
-        q = f"name='{nombre_archivo}' and '{folder_id}' in parents and trashed=false"
-        result = service.files().list(q=q, fields="files(id)").execute()
-        archivos_existentes = result.get("files", [])
-
-        media = MediaFileUpload(ruta_local, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', resumable=True)
-
-        if archivos_existentes:
-            file_id = archivos_existentes[0]['id']
-            service.files().update(fileId=file_id, media_body=media).execute()
-            print(f"🔁 Archivo '{nombre_archivo}' actualizado en Drive.")
-        else:
-            metadata = {'name': nombre_archivo, 'parents': [folder_id]}
-            service.files().create(body=metadata, media_body=media, fields='id').execute()
-            print(f"✅ Archivo '{nombre_archivo}' subido a Drive.")
-        return True
-    except Exception as e:
-        print(f"❌ Error subiendo archivo a Drive: {e}")
-        return False
+def listar_archivos(usuario):
+    """Lista archivos según el modo (R2 o local)"""
+    if MODO_R2:
+        return listar_archivos_r2(usuario)
+    else:
+        return listar_archivos_local(usuario)
 
 
-# === FLASK APP ===
-app = Flask(__name__)
-app.secret_key = "BanfiClaveSegura123"
-
-USERS = {
-    "DSUBICI": {"password": "Banfi138", "rol": "admin"},
-    "usuario1": {"password": "contraseña1", "rol": "user"},
-    "usuario2": {"password": "contraseña2", "rol": "user"},
-    "usuario3": {"password": "contraseña3", "rol": "user"},
-    "usuario4": {"password": "contraseña4", "rol": "user"},
-    "RIVADAVIA": {"password": "rivadavia5", "rol": "user"},
-}
-
-
+# === FUNCIONES DE POLÍGONOS ===
 def cargar_poligonos(ruta_archivo):
     df = pd.read_excel(ruta_archivo)
     columnas = ["NOMBRE", "SUPERFICIE", "STATUS", "STATUS1", "STATUS2", "STATUS3", "PARTIDO", "COLOR HEX", "COORDENADAS"]
     for col in columnas:
         if col not in df.columns:
             df[col] = ""
+    
     poligonos = []
     for _, fila in df.iterrows():
         coords = []
@@ -286,6 +214,7 @@ def cargar_poligonos(ruta_archivo):
                     coords.append([lat, lon])
             except Exception:
                 coords = []
+        
         poligonos.append({
             "name": str(fila["NOMBRE"]),
             "superficie": str(fila["SUPERFICIE"]),
@@ -298,16 +227,13 @@ def cargar_poligonos(ruta_archivo):
             "coords": coords,
             "COORDENADAS": str(fila["COORDENADAS"]) if pd.notna(fila["COORDENADAS"]) else ""
         })
+    
     return poligonos
 
-def guardar_poligonos(nuevos_datos, ruta_destino):
-    """
-    Guarda los datos actualizados en el archivo Excel con nombres de columna fijos
-    y en el orden correcto. Evita mezclas entre mayúsculas/minúsculas.
-    """
-    columnas = ["NOMBRE", "SUPERFICIE", "STATUS", "STATUS1", "STATUS2", "STATUS3", "PARTIDO", "COLOR HEX", "COORDENADAS"]
 
-    # Crear DataFrame nuevo con los datos recibidos
+def guardar_poligonos(nuevos_datos, ruta_destino):
+    columnas = ["NOMBRE", "SUPERFICIE", "STATUS", "STATUS1", "STATUS2", "STATUS3", "PARTIDO", "COLOR HEX", "COORDENADAS"]
+    
     df = pd.DataFrame([
         {
             "NOMBRE": dato.get("name", ""),
@@ -322,8 +248,7 @@ def guardar_poligonos(nuevos_datos, ruta_destino):
         }
         for dato in nuevos_datos
     ], columns=columnas)
-
-    # Guardar Excel
+    
     df.to_excel(ruta_destino, index=False)
 
 
@@ -355,17 +280,31 @@ def logout():
 def seleccionar_archivo():
     if "usuario" not in session:
         return redirect(url_for("login_page"))
+    
     user = session["usuario"]
-    archivos = listar_archivos(user)  # ← Usa función unificada
-    return render_template("seleccionar_archivo.html", archivos=archivos, usuario=user, rol=session["rol"])
-
+    
+    try:
+        archivos = listar_archivos(user)
+        print(f"✅ Listado exitoso para {user}: {len(archivos)} archivos")
+    except Exception as e:
+        print(f"❌ Error al listar archivos para {user}: {e}")
+        import traceback
+        print(traceback.format_exc())
+        archivos = []
+    
+    return render_template(
+        "seleccionar_archivo.html", 
+        archivos=archivos, 
+        usuario=user, 
+        rol=session.get("rol", "user")
+    )
 
 @app.route("/abrir/<nombre>")
 def abrir_archivo(nombre):
     if "usuario" not in session:
         return redirect(url_for("login_page"))
     user = session["usuario"]
-    ruta_local = obtener_archivo(user, nombre)  # ← Usa función unificada
+    ruta_local = obtener_archivo(user, nombre)
     if not ruta_local:
         return f"No se pudo obtener '{nombre}'.", 404
     session["archivo_seleccionado"] = nombre
@@ -382,8 +321,7 @@ def guardar():
         data = request.get_json(force=True)
         user = session.get("usuario")
         
-        # Determinar ruta según el modo
-        if MODO_RENDER:
+        if MODO_R2:
             ruta = os.path.join(BASE_DIR, archivo_sel)
         else:
             user_dir = os.path.join(BASE_DIR, user)
@@ -391,7 +329,7 @@ def guardar():
             ruta = os.path.join(user_dir, archivo_sel)
         
         guardar_poligonos(data["datos"], ruta)
-        guardar_archivo(user, ruta)  # ← Usa función unificada
+        guardar_archivo(user, ruta)
         return jsonify({"success": True, "mensaje": "✅ Cambios guardados correctamente."})
     except Exception as e:
         return jsonify({"success": False, "mensaje": f"❌ Error: {e}"})
@@ -403,14 +341,16 @@ def guardar_como():
         contenido = request.get_json(force=True)
         datos = contenido.get("datos", [])
         nuevo_nombre = contenido.get("nuevo_nombre", "").strip()
+        
         if not nuevo_nombre:
             return jsonify({"success": False, "mensaje": "⚠️ No se indicó nombre."})
+        
         if not nuevo_nombre.lower().endswith(".xlsx"):
             nuevo_nombre += ".xlsx"
+        
         user = session.get("usuario")
         
-        # Determinar ruta según el modo
-        if MODO_RENDER:
+        if MODO_R2:
             ruta_nueva = os.path.join(BASE_DIR, nuevo_nombre)
         else:
             user_dir = os.path.join(BASE_DIR, user)
@@ -418,10 +358,20 @@ def guardar_como():
             ruta_nueva = os.path.join(user_dir, nuevo_nombre)
         
         guardar_poligonos(datos, ruta_nueva)
-        guardar_archivo(user, ruta_nueva)  # ← Usa función unificada
-        return jsonify({"success": True, "mensaje": f"✅ Archivo guardado como '{nuevo_nombre}'."})
+        exito = guardar_archivo(user, ruta_nueva)
+        
+        if exito:
+            if MODO_R2:
+                try:
+                    os.remove(ruta_nueva)
+                except:
+                    pass
+            return jsonify({"success": True, "mensaje": f"✅ Archivo '{nuevo_nombre}' guardado correctamente."})
+        else:
+            return jsonify({"success": False, "mensaje": "❌ Error al guardar archivo."})
+    
     except Exception as e:
-        return jsonify({"success": False, "mensaje": f"❌ Error al guardar: {e}"})
+        return jsonify({"success": False, "mensaje": f"❌ Error: {str(e)}"})
 
 
 if __name__ == "__main__":

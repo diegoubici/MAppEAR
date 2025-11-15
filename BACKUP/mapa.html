@@ -9,7 +9,7 @@
   table.dataTable {
   border-collapse: collapse !important;
   border-spacing: 0 !important;
-}
+} 
 
 table.dataTable th,
 table.dataTable td {
@@ -126,12 +126,12 @@ tr.seleccionado { background-color:#FFFF99 !important; }
 .menu-grabar div { padding:8px 12px; font-size:11px; cursor:pointer; transition:background 0.2s; }
 .menu-grabar div:hover { background:#f0f0f0; }
 #tablaPoligonos th:nth-child(1), #tablaPoligonos td:nth-child(1) { width: 20px; }   /* Sel */
-#tablaPoligonos th:nth-child(2), #tablaPoligonos td:nth-child(2) { width: 100px; } /* Nombre */
-#tablaPoligonos th:nth-child(3), #tablaPoligonos td:nth-child(3) { width: 20px; }  /* Has */
+#tablaPoligonos th:nth-child(2), #tablaPoligonos td:nth-child(2) { width: 110px; } /* Nombre */
+#tablaPoligonos th:nth-child(3), #tablaPoligonos td:nth-child(3) { width: 30px; }  /* Has */
 #tablaPoligonos th:nth-child(4), #tablaPoligonos td:nth-child(4) { width: 60px; }  /* Status */
 #tablaPoligonos th:nth-child(5), #tablaPoligonos td:nth-child(5) { width: 60px; }  /* Status1 */
 #tablaPoligonos th:nth-child(6), #tablaPoligonos td:nth-child(6) { width: 60px; }  /* Status2 */
-#tablaPoligonos th:nth-child(7), #tablaPoligonos td:nth-child(7) { width: 80px; }  /* Status3 */
+#tablaPoligonos th:nth-child(7), #tablaPoligonos td:nth-child(7) { width: 60px; }  /* Status3 */
 #tablaPoligonos th:nth-child(8), #tablaPoligonos td:nth-child(8) { width: 70px; }  /* Partido */
 #tablaPoligonos th:nth-child(9), #tablaPoligonos td:nth-child(9) { width: 30px; }  /* Color */
 
@@ -175,6 +175,8 @@ tr.seleccionado { background-color:#FFFF99 !important; }
 
       <button id="seleccionarFiltrados" style="background-color:#28a745;">Seleccionar</button>
       <button id="deseleccionarTodos" style="background-color:#dc3545;">Deseleccionar</button>
+      <button id="btnLimpiar" class="btn btn-warning-color:#dc3545;">LIMPIAR</button>
+
     </div>
 
     <div id="filtros">
@@ -267,7 +269,7 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{ attribution:'
 
 poligonos.forEach((p, idx)=>{
   if(p.coords && p.coords.length>0){
-    const poly = L.polygon(p.coords,{color:"#0000FF",weight:0.5,fillColor:p.color,fillOpacity:0.6})
+    const poly = L.polygon(p.coords,{color:"#000000",weight:0.5,fillColor:p.color,fillOpacity:0.6})
       .addTo(map)
       .bindPopup("<b>"+p.name+"</b><br>"+p.superficie+" has");
     poly.index = idx;
@@ -537,6 +539,28 @@ $('#exportarPDF').on('click',()=>{
   });
   doc.save('poligonos.pdf');
 });
+// === BOTÓN LIMPIAR ===
+document.getElementById("btnLimpiar").addEventListener("click", function() {
+    // Limpiar filtros
+    document.querySelectorAll("#filtros input[type='text']").forEach(input => {
+        input.value = "";
+    });
+
+    // Limpiar campos de edición masiva
+    document.querySelectorAll("#edicion-masiva input[type='text']").forEach(input => {
+        input.value = "";
+    });
+
+    // Restaurar todas las filas visibles
+    $("#tablaPoligonos tbody tr").show();
+
+    // Limpiar selección de color en bloque
+    document.getElementById("colorBloque").value = "";
+
+    alert("Filtros y campos de edición limpiados.");
+});
+
+
 </script>
 </body>
 </html>

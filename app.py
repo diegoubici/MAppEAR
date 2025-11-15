@@ -1,43 +1,38 @@
 import os
+import io
 import pandas as pd
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session
 import boto3
-from io import BytesIO
+from botocore.exceptions import ClientError
 
-# === CLOUDFLARE R2 CONFIGURATION ===
+# === CONFIG (lee todo desde variables de entorno) ===
 R2_ACCESS_KEY = os.getenv("R2_ACCESS_KEY")
 R2_SECRET_KEY = os.getenv("R2_SECRET_KEY")
 R2_BUCKET = os.getenv("R2_BUCKET")
 R2_ENDPOINT = os.getenv("R2_ENDPOINT")
+FLASK_SECRET_KEY = os.getenv("FLASK_SECRET_KEY", "BanfiClaveSegura123")
 
-# Detectar si estamos en modo Render (con R2) o Local
+# Verificar configuración mínima
 MODO_R2 = all([R2_ACCESS_KEY, R2_SECRET_KEY, R2_BUCKET, R2_ENDPOINT])
 
 if MODO_R2:
-    print("🌐 MODO: RENDER/R2 (usando Cloudflare R2)")
+    print("🌐 MODO: R2 (Cloudflare R2) - leyendo y guardando exclusivamente en R2")
+    # crear cliente S3 compatible (Cloudflare R2)
     r2_client = boto3.client(
         "s3",
         endpoint_url=R2_ENDPOINT,
         aws_access_key_id=R2_ACCESS_KEY,
         aws_secret_access_key=R2_SECRET_KEY
     )
-    BASE_DIR = "/tmp"
 else:
-    print("🖥️  MODO: LOCAL (usando carpetas locales)")
-    if os.path.exists(r"C:\MAPPEAR"):
-        BASE_DIR = r"C:\MAPPEAR\data"
-    elif os.path.exists(r"F:\MAPPEAR"):
-        BASE_DIR = r"F:\MAPPEAR\data"
-    else:
-        BASE_DIR = os.path.join(os.getcwd(), "data")
-
-os.makedirs(BASE_DIR, exist_ok=True)
-print(f"📁 BASE_DIR: {BASE_DIR}")
+    print("⚠️ R2 no está configurado completamente. El programa seguirá en modo de prueba sin R2.")
+    r2_client = None
 
 # === FLASK APP ===
 app = Flask(__name__)
-app.secret_key = "BanfiClaveSegura123"
+app.secret_key = FLASK_SECRET_KEY
 
+# Usuarios (mantener o ajustar)
 USERS = {
     "DSUBICI": {"password": "Banfi138", "rol": "admin"},
     "usuario1": {"password": "contraseña1", "rol": "user"},
@@ -47,162 +42,84 @@ USERS = {
     "RIVADAVIA": {"password": "rivadavia5", "rol": "user"},
 }
 
-# === FUNCIONES R2 ===
+# === UTILIDADES R2 ===
+
 def listar_archivos_r2(usuario):
-    """Lista archivos .xlsx del usuario en R2"""
+    """Lista archivos .xlsx dentro del prefijo usuario/ en R2."""
+    if not MODO_R2:
+        return []
+    prefix = f"{usuario}/"
     try:
-        prefix = f"{usuario}/"
-        response = r2_client.list_objects_v2(Bucket=R2_BUCKET, Prefix=prefix)
-        
+        resp = r2_client.list_objects_v2(Bucket=R2_BUCKET, Prefix=prefix)
         archivos = []
-        if "Contents" in response:
-            for obj in response["Contents"]:
-                nombre = obj["Key"]
-                if nombre.lower().endswith(".xlsx") and "/" in nombre:
-                    archivos.append(nombre.split("/", 1)[1])  # Quitar prefijo usuario/
-        
-        print(f"📄 Archivos R2 encontrados para {usuario}: {archivos}")
-        return sorted(archivos)
+        for obj in resp.get("Contents", []):
+            key = obj["Key"]
+            # ignorar "carpetas" (keys que terminan en '/')
+            if key.lower().endswith(".xlsx"):
+                # sacar prefijo usuario/
+                archivos.append(key.split("/", 1)[1])
+        archivos = sorted([a for a in archivos if a])
+        print(f"📄 Archivos en R2/{usuario}: {archivos}")
+        return archivos
+    except ClientError as e:
+        print(f"❌ Error listando en R2: {e}")
+        return []
     except Exception as e:
-        print(f"❌ Error listando archivos R2: {e}")
+        print(f"❌ Excepción listar_archivos_r2: {e}")
         return []
 
-
-def descargar_de_r2(usuario, nombre_archivo):
-    """Descarga archivo desde R2"""
+def descargar_de_r2_a_dataframe(usuario, nombre_archivo):
+    """Descarga el archivo desde R2 y devuelve la ruta in-memory o el DataFrame."""
+    if not MODO_R2:
+        return None
+    key = f"{usuario}/{nombre_archivo}"
     try:
-        key = f"{usuario}/{nombre_archivo}"
-        response = r2_client.get_object(Bucket=R2_BUCKET, Key=key)
-        data = response["Body"].read()
-        
-        ruta_local = os.path.join(BASE_DIR, nombre_archivo)
-        with open(ruta_local, "wb") as f:
-            f.write(data)
-        
-        print(f"⬇️ Archivo '{nombre_archivo}' descargado de R2")
-        return ruta_local
+        resp = r2_client.get_object(Bucket=R2_BUCKET, Key=key)
+        data = resp["Body"].read()
+        bio = io.BytesIO(data)
+        # pandas puede leer directamente desde BytesIO
+        return bio
+    except ClientError as e:
+        print(f"❌ Error al descargar {key} de R2: {e}")
+        return None
     except Exception as e:
-        print(f"❌ Error descargando de R2: {e}")
+        print(f"❌ Excepción descargar_de_r2: {e}")
         return None
 
-
-def subir_a_r2(usuario, ruta_local):
-    """Sube archivo a R2"""
+def subir_bytes_a_r2(usuario, nombre_archivo, bytes_data):
+    """Sube el contenido (bytes) a R2 en la key usuario/nombre_archivo"""
+    if not MODO_R2:
+        return False
+    key = f"{usuario}/{nombre_archivo}"
     try:
-        nombre_archivo = os.path.basename(ruta_local)
-        key = f"{usuario}/{nombre_archivo}"
-        
-        with open(ruta_local, "rb") as f:
-            r2_client.put_object(
-                Bucket=R2_BUCKET,
-                Key=key,
-                Body=f.read(),
-                ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
-        
-        print(f"✅ Archivo '{nombre_archivo}' subido a R2")
+        r2_client.put_object(
+            Bucket=R2_BUCKET,
+            Key=key,
+            Body=bytes_data,
+            ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+        print(f"✅ Subido a R2: {key}")
         return True
+    except ClientError as e:
+        print(f"❌ Error subiendo a R2 {key}: {e}")
+        return False
     except Exception as e:
-        print(f"❌ Error subiendo a R2: {e}")
+        print(f"❌ Excepción subir_bytes_a_r2: {e}")
         return False
 
+# === Funciones de poligonos usando pandas pero todo desde BytesIO ===
 
-# === FUNCIONES LOCALES ===
-def listar_archivos_local(usuario):
-    """Lista archivos en carpeta local"""
+def cargar_poligonos_desde_ruta_bytesio(bio):
+    """Lee un pandas DataFrame desde un BytesIO y devuelve la estructura de polígonos."""
     try:
-        user_dir = os.path.join(BASE_DIR, usuario)
-        os.makedirs(user_dir, exist_ok=True)
-        
-        archivos = [f for f in os.listdir(user_dir) if f.lower().endswith(".xlsx")]
-        print(f"📄 Archivos locales encontrados para {usuario}: {archivos}")
-        return sorted(archivos)
+        df = pd.read_excel(bio)
     except Exception as e:
-        print(f"❌ Error listando archivos locales: {e}")
+        print(f"❌ Error leyendo Excel desde bytes: {e}")
         return []
-
-
-def obtener_archivo_local(usuario, nombre_archivo):
-    """Obtiene ruta de archivo local"""
-    try:
-        user_dir = os.path.join(BASE_DIR, usuario)
-        ruta_archivo = os.path.join(user_dir, nombre_archivo)
-        
-        if os.path.exists(ruta_archivo):
-            print(f"✅ Archivo local encontrado: {ruta_archivo}")
-            return ruta_archivo
-        else:
-            print(f"❌ Archivo local no encontrado: {ruta_archivo}")
-            return None
-    except Exception as e:
-        print(f"❌ Error obteniendo archivo local: {e}")
-        return None
-
-
-# === FUNCIONES UNIFICADAS ===
-def listar_archivos_r2(usuario):
-    """Lista archivos .xlsx del usuario en R2"""
-    try:
-        if not all([R2_ACCESS_KEY, R2_SECRET_KEY, R2_BUCKET, R2_ENDPOINT]):
-            print("⚠️ Configuración R2 incompleta, usando lista vacía")
-            return []
-        
-        prefix = f"{usuario}/"
-        print(f"🔍 Listando archivos R2 con prefix: {prefix}")
-        
-        response = r2_client.list_objects_v2(Bucket=R2_BUCKET, Prefix=prefix)
-        
-        archivos = []
-        if "Contents" in response:
-            for obj in response["Contents"]:
-                nombre = obj["Key"]
-                # Solo archivos .xlsx, no carpetas vacías
-                if nombre.lower().endswith(".xlsx") and "/" in nombre:
-                    archivo_solo = nombre.split("/", 1)[1]  # Quitar prefijo usuario/
-                    if archivo_solo:  # No agregar strings vacíos
-                        archivos.append(archivo_solo)
-        
-        print(f"📄 Archivos R2 encontrados para {usuario}: {archivos}")
-        return sorted(archivos)
-    except Exception as e:
-        print(f"❌ Error listando archivos R2: {e}")
-        import traceback
-        print(traceback.format_exc())
-        return []  # Retornar lista vacía en caso de error
-
-
-def obtener_archivo(usuario, nombre_archivo):
-    """Obtiene archivo (R2 o local según modo)"""
-    if MODO_R2:
-        return descargar_de_r2(usuario, nombre_archivo)
-    else:
-        return obtener_archivo_local(usuario, nombre_archivo)
-
-
-def guardar_archivo(usuario, ruta_local):
-    """Guarda archivo (R2 o local según modo)"""
-    if MODO_R2:
-        return subir_a_r2(usuario, ruta_local)
-    else:
-        print(f"✅ Archivo guardado localmente: {ruta_local}")
-        return True
-
-def listar_archivos(usuario):
-    """Lista archivos según el modo (R2 o local)"""
-    if MODO_R2:
-        return listar_archivos_r2(usuario)
-    else:
-        return listar_archivos_local(usuario)
-
-
-# === FUNCIONES DE POLÍGONOS ===
-def cargar_poligonos(ruta_archivo):
-    df = pd.read_excel(ruta_archivo)
     columnas = ["NOMBRE", "SUPERFICIE", "STATUS", "STATUS1", "STATUS2", "STATUS3", "PARTIDO", "COLOR HEX", "COORDENADAS"]
     for col in columnas:
         if col not in df.columns:
             df[col] = ""
-    
     poligonos = []
     for _, fila in df.iterrows():
         coords = []
@@ -214,7 +131,6 @@ def cargar_poligonos(ruta_archivo):
                     coords.append([lat, lon])
             except Exception:
                 coords = []
-        
         poligonos.append({
             "name": str(fila["NOMBRE"]),
             "superficie": str(fila["SUPERFICIE"]),
@@ -227,36 +143,35 @@ def cargar_poligonos(ruta_archivo):
             "coords": coords,
             "COORDENADAS": str(fila["COORDENADAS"]) if pd.notna(fila["COORDENADAS"]) else ""
         })
-    
     return poligonos
 
-
-def guardar_poligonos(nuevos_datos, ruta_destino):
+def guardar_poligonos_en_r2(nuevos_datos, usuario, nombre_archivo):
+    """Crea un Excel en memoria desde nuevos_datos y lo sube a R2 en usuario/nombre_archivo"""
     columnas = ["NOMBRE", "SUPERFICIE", "STATUS", "STATUS1", "STATUS2", "STATUS3", "PARTIDO", "COLOR HEX", "COORDENADAS"]
-    
     df = pd.DataFrame([
         {
-            "NOMBRE": dato.get("name", ""),
-            "SUPERFICIE": dato.get("superficie", ""),
-            "STATUS": dato.get("status", ""),
-            "STATUS1": dato.get("status1", ""),
-            "STATUS2": dato.get("status2", ""),
-            "STATUS3": dato.get("status3", ""),
-            "PARTIDO": dato.get("partido", ""),
-            "COLOR HEX": dato.get("color", "#CCCCCC"),
-            "COORDENADAS": dato.get("COORDENADAS", "")
-        }
-        for dato in nuevos_datos
+            "NOMBRE": d.get("name", ""),
+            "SUPERFICIE": d.get("superficie", ""),
+            "STATUS": d.get("status", ""),
+            "STATUS1": d.get("status1", ""),
+            "STATUS2": d.get("status2", ""),
+            "STATUS3": d.get("status3", ""),
+            "PARTIDO": d.get("partido", ""),
+            "COLOR HEX": d.get("color", "#CCCCCC"),
+            "COORDENADAS": d.get("COORDENADAS", "")
+        } for d in nuevos_datos
     ], columns=columnas)
-    
-    df.to_excel(ruta_destino, index=False)
+    bio = io.BytesIO()
+    with pd.ExcelWriter(bio, engine="openpyxl") as writer:
+        df.to_excel(writer, index=False)
+    bio.seek(0)
+    return subir_bytes_a_r2(usuario, nombre_archivo, bio.read())
 
+# === Rutas ===
 
-# === RUTAS ===
 @app.route("/", methods=["GET"])
 def login_page():
     return render_template("login.html")
-
 
 @app.route("/login", methods=["POST"])
 def login():
@@ -269,48 +184,30 @@ def login():
         return redirect(url_for("seleccionar_archivo"))
     return render_template("login.html", error="Usuario o contraseña incorrectos.")
 
-
 @app.route("/logout")
 def logout():
     session.clear()
-    return redirect("https://www.google.com.ar")
-
+    return redirect("/")
 
 @app.route("/inicio")
 def seleccionar_archivo():
     if "usuario" not in session:
         return redirect(url_for("login_page"))
-    
     user = session["usuario"]
-    
-    try:
-        archivos = listar_archivos(user)
-        print(f"✅ Listado exitoso para {user}: {len(archivos)} archivos")
-    except Exception as e:
-        print(f"❌ Error al listar archivos para {user}: {e}")
-        import traceback
-        print(traceback.format_exc())
-        archivos = []
-    
-    return render_template(
-        "seleccionar_archivo.html", 
-        archivos=archivos, 
-        usuario=user, 
-        rol=session.get("rol", "user")
-    )
+    archivos = listar_archivos_r2(user) if MODO_R2 else []
+    return render_template("seleccionar_archivo.html", archivos=archivos, usuario=user, rol=session.get("rol","user"))
 
 @app.route("/abrir/<nombre>")
 def abrir_archivo(nombre):
     if "usuario" not in session:
         return redirect(url_for("login_page"))
     user = session["usuario"]
-    ruta_local = obtener_archivo(user, nombre)
-    if not ruta_local:
+    bio = descargar_de_r2_a_dataframe(user, nombre) if MODO_R2 else None
+    if not bio:
         return f"No se pudo obtener '{nombre}'.", 404
+    poligonos = cargar_poligonos_desde_ruta_bytesio(bio)
     session["archivo_seleccionado"] = nombre
-    poligonos = cargar_poligonos(ruta_local)
-    return render_template("mapa.html", usuario=user, rol=session["rol"], poligonos=poligonos)
-
+    return render_template("mapa.html", usuario=user, rol=session.get("rol","user"), poligonos=poligonos)
 
 @app.route("/guardar", methods=["POST"])
 def guardar():
@@ -320,20 +217,13 @@ def guardar():
     try:
         data = request.get_json(force=True)
         user = session.get("usuario")
-        
-        if MODO_R2:
-            ruta = os.path.join(BASE_DIR, archivo_sel)
+        exito = guardar_poligonos_en_r2(data["datos"], user, archivo_sel)
+        if exito:
+            return jsonify({"success": True, "mensaje": "✅ Cambios guardados correctamente en R2."})
         else:
-            user_dir = os.path.join(BASE_DIR, user)
-            os.makedirs(user_dir, exist_ok=True)
-            ruta = os.path.join(user_dir, archivo_sel)
-        
-        guardar_poligonos(data["datos"], ruta)
-        guardar_archivo(user, ruta)
-        return jsonify({"success": True, "mensaje": "✅ Cambios guardados correctamente."})
+            return jsonify({"success": False, "mensaje": "❌ Error al guardar en R2."})
     except Exception as e:
         return jsonify({"success": False, "mensaje": f"❌ Error: {e}"})
-
 
 @app.route("/guardar_como", methods=["POST"])
 def guardar_como():
@@ -341,38 +231,39 @@ def guardar_como():
         contenido = request.get_json(force=True)
         datos = contenido.get("datos", [])
         nuevo_nombre = contenido.get("nuevo_nombre", "").strip()
-        
         if not nuevo_nombre:
             return jsonify({"success": False, "mensaje": "⚠️ No se indicó nombre."})
-        
         if not nuevo_nombre.lower().endswith(".xlsx"):
             nuevo_nombre += ".xlsx"
-        
         user = session.get("usuario")
-        
-        if MODO_R2:
-            ruta_nueva = os.path.join(BASE_DIR, nuevo_nombre)
-        else:
-            user_dir = os.path.join(BASE_DIR, user)
-            os.makedirs(user_dir, exist_ok=True)
-            ruta_nueva = os.path.join(user_dir, nuevo_nombre)
-        
-        guardar_poligonos(datos, ruta_nueva)
-        exito = guardar_archivo(user, ruta_nueva)
-        
+        exito = guardar_poligonos_en_r2(datos, user, nuevo_nombre)
         if exito:
-            if MODO_R2:
-                try:
-                    os.remove(ruta_nueva)
-                except:
-                    pass
-            return jsonify({"success": True, "mensaje": f"✅ Archivo '{nuevo_nombre}' guardado correctamente."})
+            return jsonify({"success": True, "mensaje": f"✅ Archivo '{nuevo_nombre}' guardado en R2."})
         else:
-            return jsonify({"success": False, "mensaje": "❌ Error al guardar archivo."})
-    
+            return jsonify({"success": False, "mensaje": "❌ Error al guardar archivo en R2."})
     except Exception as e:
         return jsonify({"success": False, "mensaje": f"❌ Error: {str(e)}"})
 
+# Ruta para subir archivos desde la web (solo DSUBICI ve el botón y solo DSUBICI puede usarla)
+@app.route("/upload_file", methods=["POST"])
+def upload_file():
+    if session.get("usuario") != "DSUBICI":
+        return jsonify({"success": False, "mensaje": "No autorizado"}), 403
+    if "file" not in request.files:
+        return jsonify({"success": False, "mensaje": "No se recibió archivo"}), 400
+    archivo = request.files["file"]
+    # esperar que el nombre incluya el prefijo del usuario destino o elegir destino por campo
+    destino_usuario = request.form.get("dest_usuario", session.get("usuario"))
+    nombre = archivo.filename
+    try:
+        data = archivo.read()
+        ok = subir_bytes_a_r2(destino_usuario, nombre, data)
+        if ok:
+            return jsonify({"success": True, "mensaje": f"Archivo '{nombre}' subido a {destino_usuario}/ en R2"})
+        else:
+            return jsonify({"success": False, "mensaje": "Error subiendo a R2"}), 500
+    except Exception as e:
+        return jsonify({"success": False, "mensaje": f"Excepción: {e}"}), 500
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
