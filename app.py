@@ -1,5 +1,3 @@
-App · PY
-Copiar
 
 import os
 import io
