@@ -1,127 +1,177 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <title>Seleccionar archivo - {{ usuario }}</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
-  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<meta charset="UTF-8">
+<title>Seleccionar Archivo - {{ usuario }}</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    background: #f4f6f8;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 20px;
+  }
+
+  h2 {
+    color: #0056b3;
+    margin-bottom: 10px;
+  }
+
+  .subtitle {
+    color: #666;
+    font-size: 14px;
+    margin-bottom: 20px;
+  }
+
+  form {
+    background: white;
+    padding: 25px;
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+    width: 100%;
+    max-width: 400px;
+  }
+
+  label {
+    font-weight: bold;
+    font-size: 14px;
+    display: block;
+    margin-bottom: 5px;
+  }
+
+  select {
+    width: 100%;
+    padding: 10px;
+    margin: 6px 0 12px 0;
+    font-size: 14px;
+    border-radius: 5px;
+    border: 1px solid #ccc;
+    box-sizing: border-box;
+  }
+
+  button {
+    width: 100%;
+    padding: 10px;
+    margin: 6px 0 12px 0;
+    font-size: 14px;
+    border-radius: 5px;
+    border: none;
+    background-color: #0056b3;
+    color: white;
+    cursor: pointer;
+    transition: background 0.2s;
+    font-weight: bold;
+  }
+
+  button:hover {
+    background-color: #003f80;
+  }
+
+  button:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+  }
+
+  .footer {
+    text-align: center;
+    margin-top: 20px;
+  }
+
+  .logout-btn {
+    display: inline-block;
+    background-color: #dc3545;
+    color: white;
+    padding: 10px 20px;
+    border-radius: 5px;
+    text-decoration: none;
+    border: none;
+    cursor: pointer;
+    transition: background 0.2s;
+    font-weight: bold;
+  }
+
+  .logout-btn:hover {
+    background-color: #b52a37;
+  }
+
+  .info-box {
+    background-color: #e7f3ff;
+    border-left: 4px solid #0056b3;
+    padding: 12px;
+    margin-top: 20px;
+    border-radius: 5px;
+    max-width: 400px;
+    font-size: 13px;
+    color: #333;
+  }
+
+  .info-box strong {
+    color: #0056b3;
+  }
+
+  .no-files {
+    background-color: #fff3cd;
+    border-left: 4px solid #ffc107;
+    padding: 15px;
+    margin: 20px 0;
+    border-radius: 5px;
+    max-width: 400px;
+    font-size: 14px;
+    color: #856404;
+  }
+</style>
 </head>
+<body>
 
-<body class="bg-light">
-<div class="container mt-5">
+  <h2>Archivos de {{ usuario }}</h2>
+  <div class="subtitle">Selecciona un archivo para abrir y editar</div>
 
-  <div class="card shadow-lg p-4">
-    <h3 class="text-center mb-4">Bienvenido, {{ usuario }}</h3>
-
-    <!-- Listado de archivos -->
-    <h5>Archivos disponibles</h5>
-
-    {% if archivos %}
-      <ul class="list-group mb-4">
-        {% for archivo in archivos %}
-          <li class="list-group-item d-flex justify-content-between align-items-center">
-            {{ archivo }}
-            <a href="{{ url_for('abrir_archivo', nombre=archivo) }}" class="btn btn-sm btn-primary">
-              Abrir
-            </a>
-          </li>
-        {% endfor %}
-      </ul>
-    {% else %}
-      <p class="text-muted">No hay archivos aún en la carpeta.</p>
-    {% endif %}
-
-    <hr>
-
-    <!-- Crear nuevo archivo -->
-    <h5>Crear un nuevo archivo Excel</h5>
-    <div class="input-group mb-3">
-      <input type="text" id="nuevo_nombre" class="form-control" placeholder="Nombre del nuevo archivo (sin .xlsx)">
-      <button class="btn btn-success" id="btn_crear">Crear</button>
-    </div>
-
-    <div id="mensaje" class="mt-3"></div>
-
-    <hr>
-
-    <!-- SUBIR ARCHIVO SOLO PARA DSUBICI -->
-    {% if usuario == 'DSUBICI' %}
-      <h5>Subir archivo a esta carpeta</h5>
-
-      <form id="uploadForm" enctype="multipart/form-data">
-        <input type="file" name="file" class="form-control mb-2" required>
-        <button class="btn btn-warning w-100" type="submit">Subir archivo</button>
-      </form>
-
-      <div id="upload_msg" class="mt-3"></div>
-      <hr>
-    {% endif %}
-
-    <!-- Cerrar sesión -->
-    <button id="logoutBtn" class="btn btn-outline-danger mt-3">Cerrar sesión</button>
+  {% if archivos %}
+  <form id="formAbrir">
+    <label>Seleccionar archivo:</label>
+    <select name="archivo_existente" id="selectArchivo" required>
+      <option value="">-- Elegir archivo --</option>
+      {% for a in archivos %}
+      <option value="{{ a }}">{{ a }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit">Abrir archivo</button>
+  </form>
+  {% else %}
+  <div class="no-files">
+    <strong>⚠️ No hay archivos disponibles</strong><br>
+    No se encontraron archivos .xlsx en tu carpeta de R2.<br>
+    Sube archivos manualmente a R2 en la ruta: <code>{{ usuario }}/</code>
   </div>
-</div>
+  {% endif %}
+
+  <div class="info-box">
+    <strong>ℹ️ Información:</strong><br>
+    • Los archivos se cargan desde Cloudflare R2<br>
+    • Para agregar nuevos archivos, súbelos manualmente a R2<br>
+    • Ruta en R2: <code>{{ usuario }}/nombre_archivo.xlsx</code><br>
+    • Los cambios se guardan automáticamente en R2
+  </div>
+
+  <div class="footer">
+    <a href="/logout" class="logout-btn">Cerrar sesión</a>
+  </div>
 
 <script>
-  // Crear archivo nuevo
-  $("#btn_crear").click(function() {
-    const nombre = $("#nuevo_nombre").val().trim();
-    if (!nombre) {
-      $("#mensaje").html('<div class="alert alert-warning">Ingrese un nombre válido.</div>');
-      return;
-    }
-
-    $.ajax({
-      url: "/nuevo_archivo",
-      type: "POST",
-      contentType: "application/json",
-      data: JSON.stringify({ nombre: nombre }),
-      success: function(resp) {
-        if (resp.success) {
-          $("#mensaje").html(
-            '<div class="alert alert-success">Archivo creado. ' +
-            '<a href="/abrir_archivo/' + resp.archivo + '">Abrir ahora</a></div>'
-          );
-        } else {
-          $("#mensaje").html('<div class="alert alert-danger">' + resp.mensaje + '</div>');
-        }
-      },
-      error: function() {
-        $("#mensaje").html('<div class="alert alert-danger">Error al crear archivo.</div>');
-      }
-    });
-  });
-
-  // Subir archivo (solo DSUBICI)
-  $("#uploadForm").submit(function(e) {
+document.getElementById("formAbrir")?.addEventListener("submit", function(e) {
     e.preventDefault();
-
-    let formData = new FormData(this);
-
-    $.ajax({
-      url: "/upload_file",
-      type: "POST",
-      data: formData,
-      processData: false,
-      contentType: false,
-      success: function(resp) {
-        if (resp.success) {
-          $("#upload_msg").html('<div class="alert alert-success">Archivo subido correctamente.</div>');
-          setTimeout(() => location.reload(), 1200);
-        } else {
-          $("#upload_msg").html('<div class="alert alert-danger">' + resp.mensaje + '</div>');
-        }
-      },
-      error: function() {
-        $("#upload_msg").html('<div class="alert alert-danger">Error al subir el archivo.</div>');
-      }
-    });
-  });
-
-  // Cerrar sesión
-  $("#logoutBtn").click(function() {
-    window.location.href = "/logout";
-  });
+    const archivo = document.getElementById("selectArchivo").value;
+    if (archivo) {
+        window.location.href = "/abrir/" + encodeURIComponent(archivo);
+    } else {
+        alert("Por favor selecciona un archivo");
+    }
+});
 </script>
 
 </body>
