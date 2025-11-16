@@ -1,0 +1,17 @@
+Key: R2_ACCESS_KEY
+Value: 0e10c98b86ded3176dbaa257a94d8004
+
+Key: R2_SECRET_KEY
+Value: cbf08c5e8b91bff42358e3ba50c026c15a7e2a136ead500ce21a03646f829392
+
+Key: R2_ENDPOINT
+Value: https://387d27a5b18f25a243df4828efa35e69.r2.cloudflarestorage.com
+
+Key: R2_BUCKET
+Value: [NOMBRE_DE_TU_BUCKET]
+
+Key: FLASK_SECRET_KEY
+Value: ihWXO5-dqOMKfdEA-F2aOwMrdr3Zpelmdp0le8D9-EXTRA-SECURITY-KEY-2024
+
+Key: PORT
+Value: 10000
