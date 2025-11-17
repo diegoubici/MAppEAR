@@ -264,7 +264,31 @@ const seleccionados = new Set();
 const map = L.map('map').setView([-35, -63], 8);
 
 const capas = {
-  "🛰️ Satélite": L.tileLayer('http://{s}.google.com/vts/lyrs=s&x={x}&y={y}&z={z}', {
+  "🛰️ Satélite": L.tileLayer('https://mt1.google.com/vts/lyrs=s&x={x}&y={y}&z={z}', {
+    maxZoom: 20,
+    attribution: '&copy; Google'
+  }),
+  
+  "🗺️ Híbrido": L.tileLayer('https://mt1.google.com/vts/lyrs=s,h&x={x}&y={y}&z={z}', {
+    maxZoom: 20,
+    attribution: '&copy; Google'
+  }),
+  
+  "📍 Calles": L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '&copy; OpenStreetMap'
+  }),
+  
+  "🏔️ Terreno": L.tileLayer('https://mt1.google.com/vts/lyrs=p&x={x}&y={y}&z={z}', {
+    maxZoom: 20,
+    attribution: '&copy; Google'
+  }),
+  
+  "🌍 Esri Satélite": L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    maxZoom: 19,
+    attribution: 'Tiles &copy; Esri'
+  })
+};{
     maxZoom: 20,
     subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
     attribution: '&copy; Google'
