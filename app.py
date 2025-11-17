@@ -1,4 +1,3 @@
-
 import os
 import io
 import pandas as pd
@@ -115,6 +114,56 @@ def subir_bytes_a_r2(usuario, nombre_archivo, bytes_data):
         print(f"❌ Excepción subir_bytes_a_r2: {e}")
         return False
 
+# === Funciones de utilidad para colores ===
+
+def procesar_color_con_transparencia(color_hex):
+    """
+    Procesa un color HEX y extrae el color base y la opacidad.
+    Soporta formatos:
+    - #RRGGBB (6 caracteres) → opacidad 1.0
+    - #RRGGBBAA (8 caracteres) → opacidad calculada de AA
+    
+    Retorna: {"color": "#RRGGBB", "opacity": 0.0-1.0}
+    """
+    if not color_hex or not isinstance(color_hex, str):
+        return {"color": "#CCCCCC", "opacity": 1.0}
+    
+    color_hex = str(color_hex).strip().upper()
+    
+    # Asegurar que empiece con #
+    if not color_hex.startswith("#"):
+        color_hex = "#" + color_hex
+    
+    # Remover # para procesar
+    hex_sin_hash = color_hex[1:]
+    
+    # Formato #RRGGBBAA (8 caracteres)
+    if len(hex_sin_hash) == 8:
+        color_base = "#" + hex_sin_hash[:6]  # Primeros 6 caracteres
+        alpha_hex = hex_sin_hash[6:8]  # Últimos 2 caracteres
+        try:
+            # Convertir alpha de hex (00-FF) a decimal (0.0-1.0)
+            alpha_decimal = int(alpha_hex, 16) / 255.0
+            opacity = round(alpha_decimal, 2)
+        except ValueError:
+            opacity = 1.0
+        return {"color": color_base, "opacity": opacity}
+    
+    # Formato #RRGGBB (6 caracteres) - opacidad completa
+    elif len(hex_sin_hash) == 6:
+        return {"color": color_hex, "opacity": 1.0}
+    
+    # Formato #RGB (3 caracteres) - expandir a 6
+    elif len(hex_sin_hash) == 3:
+        r, g, b = hex_sin_hash
+        color_expandido = f"#{r}{r}{g}{g}{b}{b}"
+        return {"color": color_expandido, "opacity": 1.0}
+    
+    # Formato inválido
+    else:
+        print(f"⚠️ Formato de color inválido: {color_hex}, usando color por defecto")
+        return {"color": "#CCCCCC", "opacity": 1.0}
+
 # === Funciones de polígonos - TODO en memoria, nunca en disco local ===
 
 def cargar_poligonos_desde_bytesio(bio):
@@ -145,6 +194,10 @@ def cargar_poligonos_desde_bytesio(bio):
                 print(f"⚠️ Error parseando coordenadas en fila {idx}: {e}")
                 coords = []
         
+        # Procesar color con transparencia
+        color_original = str(fila["COLOR HEX"]) if pd.notna(fila["COLOR HEX"]) else "#CCCCCC"
+        color_info = procesar_color_con_transparencia(color_original)
+        
         poligonos.append({
             "name": str(fila["NOMBRE"]) if pd.notna(fila["NOMBRE"]) else "",
             "superficie": str(fila["SUPERFICIE"]) if pd.notna(fila["SUPERFICIE"]) else "",
@@ -153,7 +206,9 @@ def cargar_poligonos_desde_bytesio(bio):
             "status2": str(fila["STATUS2"]) if pd.notna(fila["STATUS2"]) else "",
             "status3": str(fila["STATUS3"]) if pd.notna(fila["STATUS3"]) else "",
             "partido": str(fila["PARTIDO"]) if pd.notna(fila["PARTIDO"]) else "",
-            "color": str(fila["COLOR HEX"]) if pd.notna(fila["COLOR HEX"]) else "#CCCCCC",
+            "color": color_info["color"],  # Color base sin alpha
+            "opacity": color_info["opacity"],  # Opacidad como decimal 0.0-1.0
+            "colorOriginal": color_original,  # Color original del Excel (para guardarlo)
             "coords": coords,
             "COORDENADAS": str(fila["COORDENADAS"]) if pd.notna(fila["COORDENADAS"]) else ""
         })
@@ -175,7 +230,8 @@ def guardar_poligonos_en_r2(nuevos_datos, usuario, nombre_archivo):
             "STATUS2": d.get("status2", ""),
             "STATUS3": d.get("status3", ""),
             "PARTIDO": d.get("partido", ""),
-            "COLOR HEX": d.get("color", "#CCCCCC"),
+            # Usar colorOriginal si existe, sino reconstruir desde color + opacity
+            "COLOR HEX": d.get("colorOriginal", d.get("color", "#CCCCCC")),
             "COORDENADAS": d.get("COORDENADAS", "")
         } for d in nuevos_datos
     ], columns=columnas)
