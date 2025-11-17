@@ -13,7 +13,7 @@
 
 table.dataTable th,
 table.dataTable td {
-  padding: 2px 4px !important; /* ← antes suele estar en 8-10px */
+  padding: 2px 4px !important;
 }
 
 body { font-family: Arial, sans-serif; margin:0; padding:0; overflow:hidden; }
@@ -21,10 +21,8 @@ header { background-color: #0056b3; color: white; padding: 10px; height:50px; }
 header h2 { margin:0; font-size:18px; display:inline-block; }
 header span { float:right; line-height:30px; }
 
-/* Mapa */
 #map { position: fixed; top: 50px; left: 0; width: 100%; height: calc(100% - 50px); z-index:0; }
 
-/* Contenedor tabla */
 #tabla-container {
   position: absolute;
   top: 50px;
@@ -45,7 +43,6 @@ header span { float:right; line-height:30px; }
 
 #tabla-body { display:flex; flex-direction:column; flex:1; overflow:hidden; padding:0; }
 
-/* Zona superior fija */
 #botonera, #filtros, #edicion-masiva {
   flex-shrink: 0;
   padding: 5px;
@@ -87,14 +84,12 @@ header span { float:right; line-height:30px; }
   outline: none;
 }
 
-/* Scroll solo para la tabla */
 #tabla-scroll {
   flex:1;
   overflow-y:auto;
   padding:5px;
 }
 
-/* Zona inferior fija (botones guardar/pdf) */
 #botonera-inferior {
   flex-shrink: 0;
   background:#f7f7f7;
@@ -108,7 +103,7 @@ header span { float:right; line-height:30px; }
 
 table.dataTable thead th { background-color:#0056b3; color:white; font-weight:bold; font-size:11px; text-align:left; }
 table.dataTable tbody tr { height:24px; }
-table.dataTable td { text-align:left; vertical-align:middle; padding: 2px 4px; }  /* reduce padding de celdas */
+table.dataTable td { text-align:left; vertical-align:middle; padding: 2px 4px; }
 td input { width: 85%; border:none; background:transparent; font-size:11px; padding:1px 1px; box-sizing:border-box; text-transform:uppercase; }
 
 td input:hover, td input:focus { background:#eef; outline:none; }
@@ -125,21 +120,26 @@ tr.seleccionado { background-color:#FFFF99 !important; }
 .menu-grabar { display:none; position:absolute; background:white; border:1px solid #ccc; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.2); min-width:160px; z-index:2000; top:auto; bottom:60px; right:60px; }
 .menu-grabar div { padding:8px 12px; font-size:11px; cursor:pointer; transition:background 0.2s; }
 .menu-grabar div:hover { background:#f0f0f0; }
-#tablaPoligonos th:nth-child(1), #tablaPoligonos td:nth-child(1) { width: 20px; }   /* Sel */
-#tablaPoligonos th:nth-child(2), #tablaPoligonos td:nth-child(2) { width: 110px; } /* Nombre */
-#tablaPoligonos th:nth-child(3), #tablaPoligonos td:nth-child(3) { width: 30px; }  /* Has */
-#tablaPoligonos th:nth-child(4), #tablaPoligonos td:nth-child(4) { width: 60px; }  /* Status */
-#tablaPoligonos th:nth-child(5), #tablaPoligonos td:nth-child(5) { width: 60px; }  /* Status1 */
-#tablaPoligonos th:nth-child(6), #tablaPoligonos td:nth-child(6) { width: 60px; }  /* Status2 */
-#tablaPoligonos th:nth-child(7), #tablaPoligonos td:nth-child(7) { width: 60px; }  /* Status3 */
-#tablaPoligonos th:nth-child(8), #tablaPoligonos td:nth-child(8) { width: 70px; }  /* Partido */
-#tablaPoligonos th:nth-child(9), #tablaPoligonos td:nth-child(9) { width: 30px; }  /* Color */
-
+#tablaPoligonos th:nth-child(1), #tablaPoligonos td:nth-child(1) { width: 20px; }
+#tablaPoligonos th:nth-child(2), #tablaPoligonos td:nth-child(2) { width: 110px; }
+#tablaPoligonos th:nth-child(3), #tablaPoligonos td:nth-child(3) { width: 30px; }
+#tablaPoligonos th:nth-child(4), #tablaPoligonos td:nth-child(4) { width: 60px; }
+#tablaPoligonos th:nth-child(5), #tablaPoligonos td:nth-child(5) { width: 60px; }
+#tablaPoligonos th:nth-child(6), #tablaPoligonos td:nth-child(6) { width: 60px; }
+#tablaPoligonos th:nth-child(7), #tablaPoligonos td:nth-child(7) { width: 60px; }
+#tablaPoligonos th:nth-child(8), #tablaPoligonos td:nth-child(8) { width: 70px; }
+#tablaPoligonos th:nth-child(9), #tablaPoligonos td:nth-child(9) { width: 30px; }
 
 #tablaPoligonos td input {
-    width: 95%;       /* ocupa casi toda la celda */
-    max-width: 100%;  /* no se pasa del ancho */
+    width: 95%;
+    max-width: 100%;
     box-sizing: border-box;
+}
+
+.leaflet-control-layers {
+  background: white;
+  border-radius: 5px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
 }
 
 </style>
@@ -147,7 +147,7 @@ tr.seleccionado { background-color:#FFFF99 !important; }
 <body>
 
 <header>
-<h2>Mapa de Polígonos - {{ usuario }}</h2>
+<h2>🛰️ Mapa de Polígonos - {{ usuario }}</h2>
 <span><a href="/logout" style="color:white;">Cerrar sesión</a></span>
 </header>
 
@@ -191,7 +191,6 @@ tr.seleccionado { background-color:#FFFF99 !important; }
       <input type="text" placeholder="Color" data-col="8" style="width:60px;">
     </div>
 
-    <!-- NUEVA SECCIÓN DE EDICIÓN MASIVA -->
     <div id="edicion-masiva">
       <div class="titulo-edicion">✏️ EDICIÓN MASIVA DE COLUMNAS</div>
       <div class="fila-edicion">
@@ -251,7 +250,6 @@ tr.seleccionado { background-color:#FFFF99 !important; }
   </div>
 </div>
 
-<!-- === LIBRERÍAS === -->
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
@@ -263,19 +261,68 @@ const poligonos = {{ poligonos|tojson }};
 const leafletPoligonos = [];
 const seleccionados = new Set();
 
-// Mapa
 const map = L.map('map').setView([-35, -63], 8);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{ attribution:'&copy; OpenStreetMap' }).addTo(map);
 
-poligonos.forEach((p, idx)=>{
-  if(p.coords && p.coords.length>0){
-    const poly = L.polygon(p.coords,{color:"#000000",weight:0.5,fillColor:p.color,fillOpacity:0.6})
-      .addTo(map)
-      .bindPopup("<b>"+p.name+"</b><br>"+p.superficie+" has");
+const capas = {
+  "🛰️ Satélite": L.tileLayer('http://{s}.google.com/vts/lyrs=s&x={x}&y={y}&z={z}', {
+    maxZoom: 20,
+    subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+    attribution: '&copy; Google'
+  }),
+  
+  "🗺️ Híbrido": L.tileLayer('http://{s}.google.com/vts/lyrs=s,h&x={x}&y={y}&z={z}', {
+    maxZoom: 20,
+    subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+    attribution: '&copy; Google'
+  }),
+  
+  "📍 Calles": L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '&copy; OpenStreetMap'
+  }),
+  
+  "🏔️ Terreno": L.tileLayer('http://{s}.google.com/vts/lyrs=p&x={x}&y={y}&z={z}', {
+    maxZoom: 20,
+    subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+    attribution: '&copy; Google'
+  }),
+  
+  "🌍 Esri Satélite": L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    maxZoom: 19,
+    attribution: 'Tiles &copy; Esri'
+  })
+};
+
+capas["🛰️ Satélite"].addTo(map);
+
+L.control.layers(capas, null, {
+  position: 'topright',
+  collapsed: false
+}).addTo(map);
+
+poligonos.forEach((p, idx) => {
+  if(p.coords && p.coords.length > 0) {
+    const fillOpacity = p.opacity !== undefined ? p.opacity : 0.6;
+    
+    const poly = L.polygon(p.coords, {
+      color: "#000000",
+      weight: 0.5,
+      fillColor: p.color,
+      fillOpacity: fillOpacity
+    })
+    .addTo(map)
+    .bindPopup("<b>" + p.name + "</b><br>" + p.superficie + " has");
+    
     poly.index = idx;
-    poly.on('click',()=>{ toggleSeleccion(idx); scrollFila(idx); });
+    poly.on('click', () => { 
+      toggleSeleccion(idx); 
+      scrollFila(idx); 
+    });
+    
     leafletPoligonos.push(poly);
-  } else leafletPoligonos.push(null);
+  } else {
+    leafletPoligonos.push(null);
+  }
 });
 
 const table = $('#tablaPoligonos').DataTable({
@@ -334,7 +381,6 @@ $('#seleccionarFiltrados').click(()=>{
 });
 $('#deseleccionarTodos').click(()=>{ Array.from(seleccionados).forEach(idx=> toggleSeleccion(idx)); });
 
-// === NUEVA FUNCIONALIDAD: EDICIÓN MASIVA DE COLUMNAS ===
 $('#editarColumnas').click(function(){
   if(seleccionados.size === 0){
     alert('Debe seleccionar al menos un registro para editar.');
@@ -344,24 +390,21 @@ $('#editarColumnas').click(function(){
   let cambiosRealizados = 0;
   const cambiosDetalle = [];
 
-  // Obtener valores de los campos de edición
   const valoresEdicion = {
-    1: $('#edit-nombre').val().trim(),      // Nombre
-    2: $('#edit-has').val().trim(),         // Has
-    3: $('#edit-status').val().trim(),      // Status
-    4: $('#edit-status1').val().trim(),     // Status1
-    5: $('#edit-status2').val().trim(),     // Status2
-    6: $('#edit-status3').val().trim(),     // Status3
-    7: $('#edit-partido').val().trim(),     // Partido
-    8: $('#edit-color').val()               // Color
+    1: $('#edit-nombre').val().trim(),
+    2: $('#edit-has').val().trim(),
+    3: $('#edit-status').val().trim(),
+    4: $('#edit-status1').val().trim(),
+    5: $('#edit-status2').val().trim(),
+    6: $('#edit-status3').val().trim(),
+    7: $('#edit-partido').val().trim(),
+    8: $('#edit-color').val()
   };
 
-  // Aplicar cambios a cada registro seleccionado
   seleccionados.forEach(idx => {
     const fila = $('#tablaPoligonos tbody tr').eq(idx);
     const inputs = fila.find('input');
 
-    // Aplicar cada valor si no está vacío
     Object.keys(valoresEdicion).forEach(col => {
       const valor = valoresEdicion[col];
       if(valor !== '') {
@@ -371,7 +414,6 @@ $('#editarColumnas').click(function(){
         
         inputElement.val(valor);
         
-        // Si es el color, también actualizar el polígono en el mapa
         if(col === '8' && leafletPoligonos[idx]) {
           leafletPoligonos[idx].setStyle({fillColor: valor});
         }
@@ -384,11 +426,9 @@ $('#editarColumnas').click(function(){
     });
   });
 
-  // Limpiar campos de edición
   $('#edicion-masiva input[type="text"]').val('');
   $('#edit-color').val('#000000');
 
-  // Mostrar resultado
   if(cambiosRealizados > 0) {
     const mensaje = `✅ Se realizaron ${cambiosRealizados} cambios en ${seleccionados.size} registros seleccionados.\n\nDetalles de cambios:\n${cambiosDetalle.slice(0, 10).join('\n')}${cambiosDetalle.length > 10 ? '\n... y más cambios.' : ''}`;
     alert(mensaje);
@@ -397,7 +437,6 @@ $('#editarColumnas').click(function(){
   }
 });
 
-// Función auxiliar para obtener el nombre de la columna
 function getColumnName(col) {
   const nombres = {
     '1': 'Nombre',
@@ -412,7 +451,6 @@ function getColumnName(col) {
   return nombres[col] || 'Campo';
 }
 
-// === FILTROS ===
 $('#filtros input').on('keyup change', function() {
   const filtros = {};
   $('#filtros input').each(function() {
@@ -436,7 +474,6 @@ $('#filtros input').on('keyup change', function() {
   });
 });
 
-// === Botonera flotante ===
 const tabla = document.getElementById("tabla-container");
 const header = document.getElementById("tabla-header");
 let offsetX, offsetY, dragging=false;
@@ -449,7 +486,6 @@ $(document).on('click',function(e){
   if(!$(e.target).closest('#btn-grabar, #menu-grabar').length){ $('#menu-grabar').hide(); }
 });
 
-// === Guardar ===
 function obtenerDatos(){
   const filas = [];
   $('#tablaPoligonos tbody tr').each(function(idx){
@@ -539,27 +575,22 @@ $('#exportarPDF').on('click',()=>{
   });
   doc.save('poligonos.pdf');
 });
-// === BOTÓN LIMPIAR ===
+
 document.getElementById("btnLimpiar").addEventListener("click", function() {
-    // Limpiar filtros
     document.querySelectorAll("#filtros input[type='text']").forEach(input => {
         input.value = "";
     });
 
-    // Limpiar campos de edición masiva
     document.querySelectorAll("#edicion-masiva input[type='text']").forEach(input => {
         input.value = "";
     });
 
-    // Restaurar todas las filas visibles
     $("#tablaPoligonos tbody tr").show();
 
-    // Limpiar selección de color en bloque
     document.getElementById("colorBloque").value = "";
 
     alert("Filtros y campos de edición limpiados.");
 });
-
 
 </script>
 </body>
