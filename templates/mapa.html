@@ -304,13 +304,19 @@ const table = $('#tablaPoligonos').DataTable({
     ordering: true,
     order: [],
     columnDefs: [
-        { orderable: false, targets: 0 }
+        { orderable: false, targets: 0 },
+        { type: 'num', targets: 2 }
     ]
 });
 
+function getFilaIndex(row) {
+  return parseInt($(row).attr('data-index'));
+}
+
 function toggleSeleccion(idx){
-  const fila = $('#tablaPoligonos tbody tr').eq(idx);
+  const fila = table.rows().nodes().to$().filter(`[data-index="${idx}"]`);
   const checkbox = fila.find('input.selectFila');
+  
   if(seleccionados.has(idx)){
     seleccionados.delete(idx);
     fila.removeClass('seleccionado');
@@ -323,18 +329,23 @@ function toggleSeleccion(idx){
     if(leafletPoligonos[idx]) leafletPoligonos[idx].setStyle({weight:2});
   }
 }
+
 function scrollFila(idx){
-  const fila = $('#tablaPoligonos tbody tr').eq(idx);
-  fila[0].scrollIntoView({behavior:"smooth", block:"center"});
+  const fila = table.rows().nodes().to$().filter(`[data-index="${idx}"]`);
+  if(fila.length > 0) {
+    fila[0].scrollIntoView({behavior:"smooth", block:"center"});
+  }
 }
+
 $('#tablaPoligonos tbody').on('click','tr',function(e){
   if($(e.target).is('input')) return;
-  const idx = $(this).data('index');
+  const idx = getFilaIndex(this);
   toggleSeleccion(idx);
   scrollFila(idx);
 });
+
 $('#tablaPoligonos tbody').on('change','input.selectFila',function(){
-  const idx = $(this).closest('tr').data('index');
+  const idx = getFilaIndex($(this).closest('tr'));
   toggleSeleccion(idx);
   scrollFila(idx);
 });
@@ -343,18 +354,22 @@ $('#aplicarColor').click(()=>{
   const color = $('#colorBloque').val();
   if(!color) return;
   seleccionados.forEach(idx=>{
-    $('#tablaPoligonos tbody tr').eq(idx).find('input.colorInput').val(color);
+    const fila = table.rows().nodes().to$().filter(`[data-index="${idx}"]`);
+    fila.find('input.colorInput').val(color);
     if(leafletPoligonos[idx]) leafletPoligonos[idx].setStyle({fillColor:color});
   });
 });
 
 $('#seleccionarFiltrados').click(()=>{
   $('#tablaPoligonos tbody tr:visible').each(function(){
-    const idx = $(this).data('index');
+    const idx = getFilaIndex(this);
     if(!seleccionados.has(idx)) toggleSeleccion(idx);
   });
 });
-$('#deseleccionarTodos').click(()=>{ Array.from(seleccionados).forEach(idx=> toggleSeleccion(idx)); });
+
+$('#deseleccionarTodos').click(()=>{ 
+  Array.from(seleccionados).forEach(idx=> toggleSeleccion(idx)); 
+});
 
 $('#editarColumnas').click(function(){
   if(seleccionados.size === 0){
@@ -377,7 +392,7 @@ $('#editarColumnas').click(function(){
   };
 
   seleccionados.forEach(idx => {
-    const fila = $('#tablaPoligonos tbody tr').eq(idx);
+    const fila = table.rows().nodes().to$().filter(`[data-index="${idx}"]`);
     const inputs = fila.find('input');
 
     Object.keys(valoresEdicion).forEach(col => {
@@ -463,8 +478,10 @@ $(document).on('click',function(e){
 
 function obtenerDatos(){
   const filas = [];
-  $('#tablaPoligonos tbody tr').each(function(idx){
-    const inputs = $(this).find('input');
+  table.rows().every(function() {
+    const row = $(this.node());
+    const idx = getFilaIndex(row);
+    const inputs = row.find('input');
     let coords = [];
     if(leafletPoligonos[idx]){
       coords = leafletPoligonos[idx].getLatLngs()[0].map(p => `${p.lng},${p.lat}`).join(" ");
@@ -527,7 +544,8 @@ $('#exportarPDF').on('click',()=>{
   const doc = new jsPDF();
   const filasPDF = [];
   seleccionados.forEach(idx=>{
-    const inputs = $('#tablaPoligonos tbody tr').eq(idx).find('input');
+    const fila = table.rows().nodes().to$().filter(`[data-index="${idx}"]`);
+    const inputs = fila.find('input');
     filasPDF.push([
       inputs.eq(0).prop('checked') ? 'X' : '',
       inputs.eq(1).val(),
