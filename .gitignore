@@ -21,3 +21,7 @@ Thumbs.db
 data/
 *.xlsx
 setup_drive.pysetup_drive.py 
+
+.env
+.env.local
+.env.*.local
