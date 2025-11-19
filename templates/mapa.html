@@ -301,13 +301,100 @@ const table = $('#tablaPoligonos').DataTable({
     scrollY: "calc(100vh - 220px)",
     searching: false,
     autoWidth: false,
-    ordering: true,
-    order: [],
-    columnDefs: [
-        { orderable: false, targets: 0 },
-        { type: 'num', targets: 2 }
-    ]
+    ordering: false
 });
+
+let ultimaColumnaOrdenada = null;
+let ordenAscendente = true;
+
+$('#tablaPoligonos thead th').each(function(colIndex) {
+    if(colIndex === 0) return;
+    
+    $(this).css('cursor', 'pointer');
+    
+    $(this).on('click', function() {
+        if(ultimaColumnaOrdenada === colIndex) {
+            ordenAscendente = !ordenAscendente;
+        } else {
+            ordenAscendente = true;
+            ultimaColumnaOrdenada = colIndex;
+        }
+        
+        ordenarSeleccionados(colIndex, ordenAscendente);
+        
+        $('#tablaPoligonos thead th').removeClass('sorting_asc sorting_desc').addClass('sorting');
+        if(ordenAscendente) {
+            $(this).removeClass('sorting sorting_desc').addClass('sorting_asc');
+        } else {
+            $(this).removeClass('sorting sorting_asc').addClass('sorting_desc');
+        }
+    });
+});
+
+function ordenarSeleccionados(colIndex, ascendente) {
+    if(seleccionados.size === 0) {
+        alert('⚠️ Debe seleccionar al menos un registro para ordenar.');
+        return;
+    }
+    
+    const filasSeleccionadas = [];
+    
+    seleccionados.forEach(idx => {
+        const fila = table.rows().nodes().to$().filter(`[data-index="${idx}"]`);
+        if(fila.length > 0) {
+            const inputs = fila.find('input');
+            let valor = inputs.eq(colIndex).val();
+            
+            if(colIndex === 2) {
+                valor = parseFloat(valor) || 0;
+            }
+            
+            filasSeleccionadas.push({
+                idx: idx,
+                fila: fila,
+                valor: valor,
+                filaCompleta: fila.clone(true, true)
+            });
+        }
+    });
+    
+    filasSeleccionadas.sort((a, b) => {
+        let valorA = a.valor;
+        let valorB = b.valor;
+        
+        if(typeof valorA === 'number' && typeof valorB === 'number') {
+            return ascendente ? valorA - valorB : valorB - valorA;
+        }
+        
+        valorA = String(valorA).toUpperCase();
+        valorB = String(valorB).toUpperCase();
+        
+        if(ascendente) {
+            return valorA.localeCompare(valorB);
+        } else {
+            return valorB.localeCompare(valorA);
+        }
+    });
+    
+    const tbody = $('#tablaPoligonos tbody');
+    const primeraFilaSeleccionada = filasSeleccionadas[0].fila;
+    
+    filasSeleccionadas.forEach((item, index) => {
+        if(index === 0) {
+            item.fila.replaceWith(item.filaCompleta);
+        } else {
+            filasSeleccionadas[index - 1].filaCompleta.after(item.filaCompleta);
+        }
+    });
+    
+    seleccionados.forEach(idx => {
+        const fila = table.rows().nodes().to$().filter(`[data-index="${idx}"]`);
+        fila.addClass('seleccionado');
+        fila.find('input.selectFila').prop('checked', true);
+    });
+    
+    console.log(`✅ Ordenados ${filasSeleccionadas.length} registros por columna ${colIndex} (${ascendente ? 'ascendente' : 'descendente'})`);
+}
 
 function getFilaIndex(row) {
   return parseInt($(row).attr('data-index'));
