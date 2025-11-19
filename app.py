@@ -5,6 +5,13 @@ from flask import Flask, render_template, request, jsonify, redirect, url_for, s
 import boto3
 from botocore.exceptions import ClientError
 
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+    print("✅ Archivo .env cargado (desarrollo local)")
+except ImportError:
+    print("ℹ️ python-dotenv no instalado (modo producción)")
+
 # === CONFIG (lee todo desde variables de entorno) ===
 R2_ACCESS_KEY = os.getenv("R2_ACCESS_KEY")
 R2_SECRET_KEY = os.getenv("R2_SECRET_KEY")
