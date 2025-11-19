@@ -5,6 +5,7 @@ from flask import Flask, render_template, request, jsonify, redirect, url_for, s
 import boto3
 from botocore.exceptions import ClientError
 
+# Cargar variables de entorno desde archivo .env (solo en local)
 try:
     from dotenv import load_dotenv
     load_dotenv()
@@ -19,12 +20,21 @@ R2_BUCKET = os.getenv("R2_BUCKET")
 R2_ENDPOINT = os.getenv("R2_ENDPOINT")
 FLASK_SECRET_KEY = os.getenv("FLASK_SECRET_KEY", "BanfiClaveSegura123")
 
-# Verificar configuración mínima
-MODO_R2 = all([R2_ACCESS_KEY, R2_SECRET_KEY, R2_BUCKET, R2_ENDPOINT])
+# Detectar si estamos en LOCAL o PRODUCCIÓN
+ES_LOCAL = os.path.exists('.env')  # Si existe .env, estamos en local
+DATA_DIR = os.path.join(os.path.dirname(__file__), 'data')  # C:\MAppEAR\data
 
-if MODO_R2:
+# Verificar configuración
+MODO_R2 = all([R2_ACCESS_KEY, R2_SECRET_KEY, R2_BUCKET, R2_ENDPOINT]) and not ES_LOCAL
+
+if ES_LOCAL:
+    print("🖥️ MODO: LOCAL - usando carpeta C:\\MAppEAR\\data")
+    if not os.path.exists(DATA_DIR):
+        os.makedirs(DATA_DIR)
+        print(f"📁 Carpeta creada: {DATA_DIR}")
+    r2_client = None
+elif MODO_R2:
     print("🌐 MODO: R2 (Cloudflare R2) - leyendo y guardando exclusivamente en R2")
-    # crear cliente S3 compatible (Cloudflare R2)
     r2_client = boto3.client(
         "s3",
         endpoint_url=R2_ENDPOINT,
@@ -49,6 +59,54 @@ USERS = {
     "RIVADAVIA": {"password": "rivadavia5", "rol": "user"},
 }
 
+# === UTILIDADES LOCALES ===
+
+def listar_archivos_local(usuario):
+    """Lista archivos .xlsx en la carpeta data/usuario/"""
+    usuario_dir = os.path.join(DATA_DIR, usuario)
+    if not os.path.exists(usuario_dir):
+        os.makedirs(usuario_dir)
+        print(f"📁 Carpeta creada: {usuario_dir}")
+        return []
+    
+    archivos = [f for f in os.listdir(usuario_dir) if f.lower().endswith('.xlsx')]
+    archivos = sorted(archivos)
+    print(f"📄 Archivos encontrados en {usuario_dir}: {archivos}")
+    return archivos
+
+def leer_archivo_local(usuario, nombre_archivo):
+    """Lee un archivo local y devuelve un BytesIO"""
+    ruta = os.path.join(DATA_DIR, usuario, nombre_archivo)
+    if not os.path.exists(ruta):
+        print(f"❌ Archivo no encontrado: {ruta}")
+        return None
+    
+    try:
+        with open(ruta, 'rb') as f:
+            data = f.read()
+        bio = io.BytesIO(data)
+        print(f"✅ Leído {len(data)} bytes de {ruta}")
+        return bio
+    except Exception as e:
+        print(f"❌ Error leyendo archivo local: {e}")
+        return None
+
+def guardar_archivo_local(usuario, nombre_archivo, bytes_data):
+    """Guarda bytes en archivo local"""
+    usuario_dir = os.path.join(DATA_DIR, usuario)
+    if not os.path.exists(usuario_dir):
+        os.makedirs(usuario_dir)
+    
+    ruta = os.path.join(usuario_dir, nombre_archivo)
+    try:
+        with open(ruta, 'wb') as f:
+            f.write(bytes_data)
+        print(f"✅ Guardado {len(bytes_data)} bytes en {ruta}")
+        return True
+    except Exception as e:
+        print(f"❌ Error guardando archivo local: {e}")
+        return False
+
 # === UTILIDADES R2 ===
 
 def listar_archivos_r2(usuario):
@@ -62,11 +120,9 @@ def listar_archivos_r2(usuario):
         archivos = []
         for obj in resp.get("Contents", []):
             key = obj["Key"]
-            # ignorar "carpetas" (keys que terminan en '/')
             if key.lower().endswith(".xlsx"):
-                # sacar prefijo usuario/
                 nombre = key.split("/", 1)[1] if "/" in key else key
-                if nombre:  # solo agregar si no está vacío
+                if nombre:
                     archivos.append(nombre)
         archivos = sorted(archivos)
         print(f"📄 Archivos encontrados en R2/{usuario}: {archivos}")
@@ -121,57 +177,66 @@ def subir_bytes_a_r2(usuario, nombre_archivo, bytes_data):
         print(f"❌ Excepción subir_bytes_a_r2: {e}")
         return False
 
+# === FUNCIONES UNIFICADAS (detectan automáticamente LOCAL o R2) ===
+
+def listar_archivos(usuario):
+    """Lista archivos según el modo (LOCAL o R2)"""
+    if ES_LOCAL:
+        return listar_archivos_local(usuario)
+    else:
+        return listar_archivos_r2(usuario)
+
+def leer_archivo(usuario, nombre_archivo):
+    """Lee archivo según el modo (LOCAL o R2)"""
+    if ES_LOCAL:
+        return leer_archivo_local(usuario, nombre_archivo)
+    else:
+        return descargar_de_r2_a_bytesio(usuario, nombre_archivo)
+
+def guardar_archivo(usuario, nombre_archivo, bytes_data):
+    """Guarda archivo según el modo (LOCAL o R2)"""
+    if ES_LOCAL:
+        return guardar_archivo_local(usuario, nombre_archivo, bytes_data)
+    else:
+        return subir_bytes_a_r2(usuario, nombre_archivo, bytes_data)
+
 # === Funciones de utilidad para colores ===
 
 def procesar_color_con_transparencia(color_hex):
-    """
-    Procesa un color HEX y extrae el color base y la opacidad.
-    Soporta formatos:
-    - #RRGGBB (6 caracteres) → opacidad 1.0
-    - #RRGGBBAA (8 caracteres) → opacidad calculada de AA
-    
-    Retorna: {"color": "#RRGGBB", "opacity": 0.0-1.0}
-    """
+    """Procesa un color HEX y extrae el color base y la opacidad."""
     if not color_hex or not isinstance(color_hex, str):
         return {"color": "#CCCCCC", "opacity": 1.0}
     
     color_hex = str(color_hex).strip().upper()
     
-    # Asegurar que empiece con #
     if not color_hex.startswith("#"):
         color_hex = "#" + color_hex
     
-    # Remover # para procesar
     hex_sin_hash = color_hex[1:]
     
-    # Formato #RRGGBBAA (8 caracteres)
     if len(hex_sin_hash) == 8:
-        color_base = "#" + hex_sin_hash[:6]  # Primeros 6 caracteres
-        alpha_hex = hex_sin_hash[6:8]  # Últimos 2 caracteres
+        color_base = "#" + hex_sin_hash[:6]
+        alpha_hex = hex_sin_hash[6:8]
         try:
-            # Convertir alpha de hex (00-FF) a decimal (0.0-1.0)
             alpha_decimal = int(alpha_hex, 16) / 255.0
             opacity = round(alpha_decimal, 2)
         except ValueError:
             opacity = 1.0
         return {"color": color_base, "opacity": opacity}
     
-    # Formato #RRGGBB (6 caracteres) - opacidad completa
     elif len(hex_sin_hash) == 6:
         return {"color": color_hex, "opacity": 1.0}
     
-    # Formato #RGB (3 caracteres) - expandir a 6
     elif len(hex_sin_hash) == 3:
         r, g, b = hex_sin_hash
         color_expandido = f"#{r}{r}{g}{g}{b}{b}"
         return {"color": color_expandido, "opacity": 1.0}
     
-    # Formato inválido
     else:
         print(f"⚠️ Formato de color inválido: {color_hex}, usando color por defecto")
         return {"color": "#CCCCCC", "opacity": 1.0}
 
-# === Funciones de polígonos - TODO en memoria, nunca en disco local ===
+# === Funciones de polígonos ===
 
 def cargar_poligonos_desde_bytesio(bio):
     """Lee un pandas DataFrame desde un BytesIO y devuelve la estructura de polígonos."""
@@ -201,7 +266,6 @@ def cargar_poligonos_desde_bytesio(bio):
                 print(f"⚠️ Error parseando coordenadas en fila {idx}: {e}")
                 coords = []
         
-        # Procesar color con transparencia
         color_original = str(fila["COLOR HEX"]) if pd.notna(fila["COLOR HEX"]) else "#CCCCCC"
         color_info = procesar_color_con_transparencia(color_original)
         
@@ -213,9 +277,9 @@ def cargar_poligonos_desde_bytesio(bio):
             "status2": str(fila["STATUS2"]) if pd.notna(fila["STATUS2"]) else "",
             "status3": str(fila["STATUS3"]) if pd.notna(fila["STATUS3"]) else "",
             "partido": str(fila["PARTIDO"]) if pd.notna(fila["PARTIDO"]) else "",
-            "color": color_info["color"],  # Color base sin alpha
-            "opacity": color_info["opacity"],  # Opacidad como decimal 0.0-1.0
-            "colorOriginal": color_original,  # Color original del Excel (para guardarlo)
+            "color": color_info["color"],
+            "opacity": color_info["opacity"],
+            "colorOriginal": color_original,
             "coords": coords,
             "COORDENADAS": str(fila["COORDENADAS"]) if pd.notna(fila["COORDENADAS"]) else ""
         })
@@ -223,9 +287,8 @@ def cargar_poligonos_desde_bytesio(bio):
     print(f"✅ Procesados {len(poligonos)} polígonos")
     return poligonos
 
-def guardar_poligonos_en_r2(nuevos_datos, usuario, nombre_archivo):
-    """Crea un Excel en memoria desde nuevos_datos y lo sube a R2 en usuario/nombre_archivo.
-    TODO el proceso se hace en memoria, NUNCA se escribe en disco local."""
+def guardar_poligonos(nuevos_datos, usuario, nombre_archivo):
+    """Crea un Excel en memoria desde nuevos_datos y lo guarda."""
     columnas = ["NOMBRE", "SUPERFICIE", "STATUS", "STATUS1", "STATUS2", "STATUS3", "PARTIDO", "COLOR HEX", "COORDENADAS"]
     
     df = pd.DataFrame([
@@ -237,20 +300,17 @@ def guardar_poligonos_en_r2(nuevos_datos, usuario, nombre_archivo):
             "STATUS2": d.get("status2", ""),
             "STATUS3": d.get("status3", ""),
             "PARTIDO": d.get("partido", ""),
-            # Usar colorOriginal si existe, sino reconstruir desde color + opacity
             "COLOR HEX": d.get("colorOriginal", d.get("color", "#CCCCCC")),
             "COORDENADAS": d.get("COORDENADAS", "")
         } for d in nuevos_datos
     ], columns=columnas)
     
-    # Crear Excel en memoria
     bio = io.BytesIO()
     with pd.ExcelWriter(bio, engine="openpyxl") as writer:
         df.to_excel(writer, index=False)
     bio.seek(0)
     
-    # Subir directamente a R2
-    return subir_bytes_a_r2(usuario, nombre_archivo, bio.read())
+    return guardar_archivo(usuario, nombre_archivo, bio.read())
 
 # === RUTAS ===
 
@@ -284,12 +344,8 @@ def seleccionar_archivo():
         return redirect(url_for("login_page"))
     
     user = session["usuario"]
+    archivos = listar_archivos(user)
     
-    if not MODO_R2:
-        return "⚠️ R2 no está configurado. Configure las variables de entorno.", 500
-    
-    # Listar archivos del usuario en R2
-    archivos = listar_archivos_r2(user)
     return render_template("seleccionar_archivo.html", 
                          archivos=archivos, 
                          usuario=user, 
@@ -301,16 +357,11 @@ def abrir_archivo(nombre):
         return redirect(url_for("login_page"))
     
     user = session["usuario"]
+    bio = leer_archivo(user, nombre)
     
-    if not MODO_R2:
-        return "⚠️ R2 no está configurado.", 500
-    
-    # Descargar archivo de R2 a memoria
-    bio = descargar_de_r2_a_bytesio(user, nombre)
     if not bio:
-        return f"❌ No se pudo obtener '{nombre}' de R2.", 404
+        return f"❌ No se pudo obtener '{nombre}'.", 404
     
-    # Procesar polígonos desde memoria
     poligonos = cargar_poligonos_desde_bytesio(bio)
     session["archivo_seleccionado"] = nombre
     
@@ -328,20 +379,17 @@ def guardar():
     if not archivo_sel:
         return jsonify({"success": False, "mensaje": "No hay archivo seleccionado."})
     
-    if not MODO_R2:
-        return jsonify({"success": False, "mensaje": "R2 no configurado."}), 500
-    
     try:
         data = request.get_json(force=True)
         user = session.get("usuario")
         
-        # Guardar directamente a R2, todo en memoria
-        exito = guardar_poligonos_en_r2(data["datos"], user, archivo_sel)
+        exito = guardar_poligonos(data["datos"], user, archivo_sel)
         
         if exito:
-            return jsonify({"success": True, "mensaje": "✅ Cambios guardados correctamente en R2."})
+            modo = "LOCAL" if ES_LOCAL else "R2"
+            return jsonify({"success": True, "mensaje": f"✅ Cambios guardados correctamente en {modo}."})
         else:
-            return jsonify({"success": False, "mensaje": "❌ Error al guardar en R2."})
+            return jsonify({"success": False, "mensaje": "❌ Error al guardar."})
     except Exception as e:
         print(f"❌ Error en /guardar: {e}")
         return jsonify({"success": False, "mensaje": f"❌ Error: {e}"})
@@ -350,9 +398,6 @@ def guardar():
 def guardar_como():
     if "usuario" not in session:
         return jsonify({"success": False, "mensaje": "No autenticado."}), 401
-    
-    if not MODO_R2:
-        return jsonify({"success": False, "mensaje": "R2 no configurado."}), 500
     
     try:
         contenido = request.get_json(force=True)
@@ -366,30 +411,23 @@ def guardar_como():
             nuevo_nombre += ".xlsx"
         
         user = session.get("usuario")
-        
-        # Guardar directamente a R2, todo en memoria
-        exito = guardar_poligonos_en_r2(datos, user, nuevo_nombre)
+        exito = guardar_poligonos(datos, user, nuevo_nombre)
         
         if exito:
-            return jsonify({"success": True, "mensaje": f"✅ Archivo '{nuevo_nombre}' guardado en R2."})
+            modo = "LOCAL" if ES_LOCAL else "R2"
+            return jsonify({"success": True, "mensaje": f"✅ Archivo '{nuevo_nombre}' guardado en {modo}."})
         else:
-            return jsonify({"success": False, "mensaje": "❌ Error al guardar archivo en R2."})
+            return jsonify({"success": False, "mensaje": "❌ Error al guardar archivo."})
     except Exception as e:
         print(f"❌ Error en /guardar_como: {e}")
         return jsonify({"success": False, "mensaje": f"❌ Error: {str(e)}"})
 
 if __name__ == "__main__":
-    if not MODO_R2:
+    if not ES_LOCAL and not MODO_R2:
         print("=" * 60)
-        print("⚠️  ADVERTENCIA: R2 NO ESTÁ CONFIGURADO")
-        print("=" * 60)
-        print("Configure las siguientes variables de entorno:")
-        print("  - R2_ACCESS_KEY")
-        print("  - R2_SECRET_KEY")
-        print("  - R2_BUCKET")
-        print("  - R2_ENDPOINT")
+        print("⚠️  ADVERTENCIA: Configuración incompleta")
         print("=" * 60)
     
-    port = int(os.environ.get("PORT", 10000))
+    port = int(os.environ.get("PORT", 5000))
     print(f"🚀 Iniciando servidor en puerto {port}")
     app.run(host="0.0.0.0", port=port, debug=False)

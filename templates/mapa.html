@@ -4,18 +4,7 @@
 <meta charset="UTF-8">
 <title>Mapa de Polígonos</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css">
-<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
 <style>
-  table.dataTable {
-  border-collapse: collapse !important;
-  border-spacing: 0 !important;
-} 
-
-table.dataTable th,
-table.dataTable td {
-  padding: 2px 4px !important;
-}
-
 body { font-family: Arial, sans-serif; margin:0; padding:0; overflow:hidden; }
 header { background-color: #0056b3; color: white; padding: 10px; height:50px; }
 header h2 { margin:0; font-size:18px; display:inline-block; }
@@ -40,7 +29,6 @@ header span { float:right; line-height:30px; }
 }
 
 #tabla-header { background-color: #0056b3; color:white; padding:5px; cursor: move; font-weight:bold; text-align:center; border-radius:5px 5px 0 0; }
-
 #tabla-body { display:flex; flex-direction:column; flex:1; overflow:hidden; padding:0; }
 
 #botonera, #filtros, #edicion-masiva {
@@ -78,12 +66,6 @@ header span { float:right; line-height:30px; }
   text-transform: uppercase;
 }
 
-#edicion-masiva input:focus {
-  background: #fff;
-  border-color: #0056b3;
-  outline: none;
-}
-
 #tabla-scroll {
   flex:1;
   overflow-y:auto;
@@ -97,45 +79,78 @@ header span { float:right; line-height:30px; }
   padding:8px;
   text-align:center;
 }
+
 #tablaPoligonos {
-    border-collapse: collapse;
+  border-collapse: collapse;
+  width: 100%;
 }
 
-table.dataTable thead th { 
+#tablaPoligonos thead th { 
   background-color:#0056b3; 
   color:white; 
   font-weight:bold; 
   font-size:11px; 
   text-align:left;
-  cursor: pointer;
+  padding: 4px;
   user-select: none;
 }
 
-table.dataTable thead th:hover {
+#tablaPoligonos thead th.sortable {
+  cursor: pointer;
+  position: relative;
+  padding-right: 20px;
+}
+
+#tablaPoligonos thead th.sortable:hover {
   background-color: #003f80;
 }
 
-table.dataTable thead .sorting:after,
-table.dataTable thead .sorting_asc:after,
-table.dataTable thead .sorting_desc:after {
+#tablaPoligonos thead th.sortable:after {
+  content: '⇅';
+  position: absolute;
+  right: 5px;
   opacity: 0.5;
-  margin-left: 5px;
+  font-size: 12px;
 }
 
-table.dataTable thead .sorting:hover:after,
-table.dataTable thead .sorting_asc:hover:after,
-table.dataTable thead .sorting_desc:hover:after {
+#tablaPoligonos thead th.sortable.asc:after {
+  content: '▲';
   opacity: 1;
+  color: yellow;
 }
 
-table.dataTable tbody tr { height:24px; }
-table.dataTable td { text-align:left; vertical-align:middle; padding: 2px 4px; }
-td input { width: 85%; border:none; background:transparent; font-size:11px; padding:1px 1px; box-sizing:border-box; text-transform:uppercase; }
+#tablaPoligonos thead th.sortable.desc:after {
+  content: '▼';
+  opacity: 1;
+  color: yellow;
+}
 
-td input:hover, td input:focus { background:#eef; outline:none; }
+#tablaPoligonos tbody tr { height:24px; }
+#tablaPoligonos td { text-align:left; vertical-align:middle; padding: 2px 4px; }
+#tablaPoligonos td input { 
+  width: 95%; 
+  border:none; 
+  background:transparent; 
+  font-size:11px; 
+  padding:1px; 
+  box-sizing:border-box; 
+  text-transform:uppercase; 
+}
+
+#tablaPoligonos td input:hover, 
+#tablaPoligonos td input:focus { background:#eef; outline:none; }
 #tablaPoligonos input[type="color"] { width:30px; height:20px; padding:0; border:none; }
 
-button { margin-top:2px; background-color:#0056b3; color:white; border:none; padding:6px 10px; cursor:pointer; border-radius:4px; font-size:11px; }
+button { 
+  margin-top:2px; 
+  background-color:#0056b3; 
+  color:white; 
+  border:none; 
+  padding:6px 10px; 
+  cursor:pointer; 
+  border-radius:4px; 
+  font-size:11px; 
+}
 button:hover { background-color:#003f80; }
 
 #editarColumnas { background-color:#28a745; }
@@ -143,24 +158,20 @@ button:hover { background-color:#003f80; }
 
 tr.seleccionado { background-color:#FFFF99 !important; }
 
-.menu-grabar { display:none; position:absolute; background:white; border:1px solid #ccc; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.2); min-width:160px; z-index:2000; top:auto; bottom:60px; right:60px; }
-.menu-grabar div { padding:8px 12px; font-size:11px; cursor:pointer; transition:background 0.2s; }
-.menu-grabar div:hover { background:#f0f0f0; }
-#tablaPoligonos th:nth-child(1), #tablaPoligonos td:nth-child(1) { width: 20px; }
-#tablaPoligonos th:nth-child(2), #tablaPoligonos td:nth-child(2) { width: 110px; }
-#tablaPoligonos th:nth-child(3), #tablaPoligonos td:nth-child(3) { width: 30px; }
-#tablaPoligonos th:nth-child(4), #tablaPoligonos td:nth-child(4) { width: 60px; }
-#tablaPoligonos th:nth-child(5), #tablaPoligonos td:nth-child(5) { width: 60px; }
-#tablaPoligonos th:nth-child(6), #tablaPoligonos td:nth-child(6) { width: 60px; }
-#tablaPoligonos th:nth-child(7), #tablaPoligonos td:nth-child(7) { width: 60px; }
-#tablaPoligonos th:nth-child(8), #tablaPoligonos td:nth-child(8) { width: 70px; }
-#tablaPoligonos th:nth-child(9), #tablaPoligonos td:nth-child(9) { width: 30px; }
-
-#tablaPoligonos td input {
-    width: 95%;
-    max-width: 100%;
-    box-sizing: border-box;
+.menu-grabar { 
+  display:none; 
+  position:absolute; 
+  background:white; 
+  border:1px solid #ccc; 
+  border-radius:8px; 
+  box-shadow:0 2px 8px rgba(0,0,0,0.2); 
+  min-width:160px; 
+  z-index:2000; 
+  bottom:60px; 
+  right:60px; 
 }
+.menu-grabar div { padding:8px 12px; font-size:11px; cursor:pointer; }
+.menu-grabar div:hover { background:#f0f0f0; }
 
 </style>
 </head>
@@ -192,11 +203,9 @@ tr.seleccionado { background-color:#FFFF99 !important; }
         {% endfor %}
       </select>
       <button id="aplicarColor">Aplicar</button>
-
       <button id="seleccionarFiltrados" style="background-color:#28a745;">Seleccionar</button>
       <button id="deseleccionarTodos" style="background-color:#dc3545;">Deseleccionar</button>
-      <button id="btnLimpiar" class="btn btn-warning-color:#dc3545;">LIMPIAR</button>
-
+      <button id="btnLimpiar" style="background-color:#ffc107;">LIMPIAR</button>
     </div>
 
     <div id="filtros">
@@ -215,29 +224,29 @@ tr.seleccionado { background-color:#FFFF99 !important; }
       <div class="titulo-edicion">✏️ EDICIÓN MASIVA DE COLUMNAS</div>
       <div class="fila-edicion">
         <span style="width:40px; font-size:10px;">Sel</span>
-        <input type="text" id="edit-nombre" placeholder="Nombre" data-col="1" style="width:120px;">
-        <input type="text" id="edit-has" placeholder="Has" data-col="2" style="width:40px;">
-        <input type="text" id="edit-status" placeholder="Status" data-col="3" style="width:56px;">
-        <input type="text" id="edit-status1" placeholder="Status1" data-col="4" style="width:56px;">
-        <input type="text" id="edit-status2" placeholder="Status2" data-col="5" style="width:80px;">
-        <input type="text" id="edit-status3" placeholder="Status3" data-col="6" style="width:56px;">
-        <input type="text" id="edit-partido" placeholder="Partido" data-col="7" style="width:80px;">
+        <input type="text" id="edit-nombre" placeholder="Nombre" style="width:120px;">
+        <input type="text" id="edit-has" placeholder="Has" style="width:40px;">
+        <input type="text" id="edit-status" placeholder="Status" style="width:56px;">
+        <input type="text" id="edit-status1" placeholder="Status1" style="width:56px;">
+        <input type="text" id="edit-status2" placeholder="Status2" style="width:80px;">
+        <input type="text" id="edit-status3" placeholder="Status3" style="width:56px;">
+        <input type="text" id="edit-partido" placeholder="Partido" style="width:80px;">
         <button id="editarColumnas">✏️ EDITAR COLUMNAS</button>
       </div>
     </div>
 
     <div id="tabla-scroll">
-      <table id="tablaPoligonos" class="display" style="width:100%">
+      <table id="tablaPoligonos">
         <thead>
           <tr>
             <th>Sel</th>
-            <th>Nombre Productor</th>
-            <th>Has</th>
-            <th>Status</th>
-            <th>Status1</th>
-            <th>Status2</th>
-            <th>Status3</th>
-            <th>Ptdo</th>
+            <th class="sortable" data-col="1">Nombre Productor</th>
+            <th class="sortable" data-col="2">Has</th>
+            <th class="sortable" data-col="3">Status</th>
+            <th class="sortable" data-col="4">Status1</th>
+            <th class="sortable" data-col="5">Status2</th>
+            <th class="sortable" data-col="6">Status3</th>
+            <th class="sortable" data-col="7">Ptdo</th>
             <th>Color</th>
           </tr>
         </thead>
@@ -272,7 +281,6 @@ tr.seleccionado { background-color:#FFFF99 !important; }
 
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
 
@@ -295,259 +303,194 @@ poligonos.forEach((p, idx)=>{
   } else leafletPoligonos.push(null);
 });
 
-const table = $('#tablaPoligonos').DataTable({
-    paging: false,
-    info: false,
-    scrollY: "calc(100vh - 220px)",
-    searching: false,
-    autoWidth: false,
-    ordering: false
-});
+// ORDENAMIENTO SIMPLE
+let lastSortCol = null;
+let sortAsc = true;
 
-let ultimaColumnaOrdenada = null;
-let ordenAscendente = true;
-
-$('#tablaPoligonos thead th').each(function(colIndex) {
-    if(colIndex === 0) return;
-    
-    $(this).css('cursor', 'pointer');
-    
-    $(this).on('click', function() {
-        if(ultimaColumnaOrdenada === colIndex) {
-            ordenAscendente = !ordenAscendente;
-        } else {
-            ordenAscendente = true;
-            ultimaColumnaOrdenada = colIndex;
+document.querySelectorAll('th.sortable').forEach(th => {
+    th.addEventListener('click', function() {
+        if(seleccionados.size === 0) {
+            alert('⚠️ Seleccione al menos un registro para ordenar');
+            return;
         }
         
-        ordenarSeleccionados(colIndex, ordenAscendente);
+        const colIdx = parseInt(this.getAttribute('data-col'));
         
-        $('#tablaPoligonos thead th').removeClass('sorting_asc sorting_desc').addClass('sorting');
-        if(ordenAscendente) {
-            $(this).removeClass('sorting sorting_desc').addClass('sorting_asc');
+        if(lastSortCol === colIdx) {
+            sortAsc = !sortAsc;
         } else {
-            $(this).removeClass('sorting sorting_asc').addClass('sorting_desc');
+            sortAsc = true;
+            lastSortCol = colIdx;
         }
+        
+        document.querySelectorAll('th.sortable').forEach(h => h.classList.remove('asc', 'desc'));
+        this.classList.add(sortAsc ? 'asc' : 'desc');
+        
+        sortSelected(colIdx, sortAsc);
     });
 });
 
-function ordenarSeleccionados(colIndex, ascendente) {
-    if(seleccionados.size === 0) {
-        alert('⚠️ Debe seleccionar al menos un registro para ordenar.');
-        return;
-    }
-    
-    const filasSeleccionadas = [];
+function sortSelected(colIdx, ascending) {
+    const tbody = document.querySelector('#tablaPoligonos tbody');
+    const selected = [];
     
     seleccionados.forEach(idx => {
-        const fila = table.rows().nodes().to$().filter(`[data-index="${idx}"]`);
-        if(fila.length > 0) {
-            const inputs = fila.find('input');
-            let valor = inputs.eq(colIndex).val();
-            
-            if(colIndex === 2) {
-                valor = parseFloat(valor) || 0;
-            }
-            
-            filasSeleccionadas.push({
-                idx: idx,
-                fila: fila,
-                valor: valor,
-                filaCompleta: fila.clone(true, true)
+        const row = tbody.querySelector(`tr[data-index="${idx}"]`);
+        if(row) {
+            const val = row.querySelectorAll('input')[colIdx].value;
+            selected.push({
+                row: row,
+                val: colIdx === 2 ? parseFloat(val) || 0 : val.toUpperCase()
             });
         }
     });
     
-    filasSeleccionadas.sort((a, b) => {
-        let valorA = a.valor;
-        let valorB = b.valor;
-        
-        if(typeof valorA === 'number' && typeof valorB === 'number') {
-            return ascendente ? valorA - valorB : valorB - valorA;
+    selected.sort((a, b) => {
+        if(typeof a.val === 'number') {
+            return ascending ? a.val - b.val : b.val - a.val;
         }
-        
-        valorA = String(valorA).toUpperCase();
-        valorB = String(valorB).toUpperCase();
-        
-        if(ascendente) {
-            return valorA.localeCompare(valorB);
-        } else {
-            return valorB.localeCompare(valorA);
-        }
+        return ascending ? a.val.localeCompare(b.val) : b.val.localeCompare(a.val);
     });
     
-    const tbody = $('#tablaPoligonos tbody');
-    const primeraFilaSeleccionada = filasSeleccionadas[0].fila;
+    const firstRow = selected[0].row;
+    const allRows = Array.from(tbody.children);
+    const insertPos = allRows.indexOf(firstRow);
     
-    filasSeleccionadas.forEach((item, index) => {
-        if(index === 0) {
-            item.fila.replaceWith(item.filaCompleta);
-        } else {
-            filasSeleccionadas[index - 1].filaCompleta.after(item.filaCompleta);
-        }
-    });
+    selected.forEach(item => item.row.remove());
+    
+    if(insertPos === 0) {
+        selected.reverse().forEach(item => tbody.insertBefore(item.row, tbody.firstChild));
+    } else {
+        const ref = tbody.children[insertPos - 1];
+        selected.forEach(item => ref.after(item.row));
+    }
     
     seleccionados.forEach(idx => {
-        const fila = table.rows().nodes().to$().filter(`[data-index="${idx}"]`);
-        fila.addClass('seleccionado');
-        fila.find('input.selectFila').prop('checked', true);
+        const row = tbody.querySelector(`tr[data-index="${idx}"]`);
+        row.classList.add('seleccionado');
+        row.querySelector('.selectFila').checked = true;
+        if(leafletPoligonos[idx]) leafletPoligonos[idx].setStyle({weight:2});
     });
     
-    console.log(`✅ Ordenados ${filasSeleccionadas.length} registros por columna ${colIndex} (${ascendente ? 'ascendente' : 'descendente'})`);
+    alert(`✅ ${selected.length} registros ordenados ${ascending ? 'ASC ▲' : 'DESC ▼'}`);
 }
 
 function getFilaIndex(row) {
-  return parseInt($(row).attr('data-index'));
+  return parseInt(row.getAttribute('data-index'));
 }
 
 function toggleSeleccion(idx){
-  const fila = table.rows().nodes().to$().filter(`[data-index="${idx}"]`);
-  const checkbox = fila.find('input.selectFila');
+  const fila = document.querySelector(`#tablaPoligonos tbody tr[data-index="${idx}"]`);
+  const checkbox = fila.querySelector('input.selectFila');
   
   if(seleccionados.has(idx)){
     seleccionados.delete(idx);
-    fila.removeClass('seleccionado');
-    checkbox.prop('checked',false);
+    fila.classList.remove('seleccionado');
+    checkbox.checked = false;
     if(leafletPoligonos[idx]) leafletPoligonos[idx].setStyle({weight:0.5});
   } else {
     seleccionados.add(idx);
-    fila.addClass('seleccionado');
-    checkbox.prop('checked',true);
+    fila.classList.add('seleccionado');
+    checkbox.checked = true;
     if(leafletPoligonos[idx]) leafletPoligonos[idx].setStyle({weight:2});
   }
 }
 
 function scrollFila(idx){
-  const fila = table.rows().nodes().to$().filter(`[data-index="${idx}"]`);
-  if(fila.length > 0) {
-    fila[0].scrollIntoView({behavior:"smooth", block:"center"});
-  }
+  const fila = document.querySelector(`#tablaPoligonos tbody tr[data-index="${idx}"]`);
+  if(fila) fila.scrollIntoView({behavior:"smooth", block:"center"});
 }
 
-$('#tablaPoligonos tbody').on('click','tr',function(e){
-  if($(e.target).is('input')) return;
-  const idx = getFilaIndex(this);
-  toggleSeleccion(idx);
-  scrollFila(idx);
+document.querySelector('#tablaPoligonos tbody').addEventListener('click', function(e){
+  if(e.target.tagName === 'INPUT') return;
+  const tr = e.target.closest('tr');
+  if(tr) {
+    const idx = getFilaIndex(tr);
+    toggleSeleccion(idx);
+    scrollFila(idx);
+  }
 });
 
-$('#tablaPoligonos tbody').on('change','input.selectFila',function(){
-  const idx = getFilaIndex($(this).closest('tr'));
-  toggleSeleccion(idx);
-  scrollFila(idx);
+document.querySelector('#tablaPoligonos tbody').addEventListener('change', function(e){
+  if(e.target.classList.contains('selectFila')) {
+    const idx = getFilaIndex(e.target.closest('tr'));
+    toggleSeleccion(idx);
+  }
 });
 
-$('#aplicarColor').click(()=>{
-  const color = $('#colorBloque').val();
+document.getElementById('aplicarColor').addEventListener('click', ()=>{
+  const color = document.getElementById('colorBloque').value;
   if(!color) return;
   seleccionados.forEach(idx=>{
-    const fila = table.rows().nodes().to$().filter(`[data-index="${idx}"]`);
-    fila.find('input.colorInput').val(color);
+    const fila = document.querySelector(`#tablaPoligonos tbody tr[data-index="${idx}"]`);
+    fila.querySelector('input.colorInput').value = color;
     if(leafletPoligonos[idx]) leafletPoligonos[idx].setStyle({fillColor:color});
   });
 });
 
-$('#seleccionarFiltrados').click(()=>{
-  $('#tablaPoligonos tbody tr:visible').each(function(){
-    const idx = getFilaIndex(this);
-    if(!seleccionados.has(idx)) toggleSeleccion(idx);
+document.getElementById('seleccionarFiltrados').addEventListener('click', ()=>{
+  document.querySelectorAll('#tablaPoligonos tbody tr').forEach(tr => {
+    if(tr.style.display !== 'none') {
+      const idx = getFilaIndex(tr);
+      if(!seleccionados.has(idx)) toggleSeleccion(idx);
+    }
   });
 });
 
-$('#deseleccionarTodos').click(()=>{ 
+document.getElementById('deseleccionarTodos').addEventListener('click', ()=>{ 
   Array.from(seleccionados).forEach(idx=> toggleSeleccion(idx)); 
 });
 
-$('#editarColumnas').click(function(){
+document.getElementById('editarColumnas').addEventListener('click', function(){
   if(seleccionados.size === 0){
-    alert('Debe seleccionar al menos un registro para editar.');
+    alert('Debe seleccionar al menos un registro');
     return;
   }
 
-  let cambiosRealizados = 0;
-  const cambiosDetalle = [];
-
-  const valoresEdicion = {
-    1: $('#edit-nombre').val().trim(),
-    2: $('#edit-has').val().trim(),
-    3: $('#edit-status').val().trim(),
-    4: $('#edit-status1').val().trim(),
-    5: $('#edit-status2').val().trim(),
-    6: $('#edit-status3').val().trim(),
-    7: $('#edit-partido').val().trim(),
-    8: $('#edit-color').val()
+  const valores = {
+    1: document.getElementById('edit-nombre').value.trim(),
+    2: document.getElementById('edit-has').value.trim(),
+    3: document.getElementById('edit-status').value.trim(),
+    4: document.getElementById('edit-status1').value.trim(),
+    5: document.getElementById('edit-status2').value.trim(),
+    6: document.getElementById('edit-status3').value.trim(),
+    7: document.getElementById('edit-partido').value.trim()
   };
 
+  let cambios = 0;
   seleccionados.forEach(idx => {
-    const fila = table.rows().nodes().to$().filter(`[data-index="${idx}"]`);
-    const inputs = fila.find('input');
-
-    Object.keys(valoresEdicion).forEach(col => {
-      const valor = valoresEdicion[col];
-      if(valor !== '') {
-        const inputIndex = parseInt(col);
-        const inputElement = inputs.eq(inputIndex);
-        const valorAnterior = inputElement.val();
-        
-        inputElement.val(valor);
-        
-        if(col === '8' && leafletPoligonos[idx]) {
-          leafletPoligonos[idx].setStyle({fillColor: valor});
-        }
-        
-        if(valorAnterior !== valor) {
-          cambiosRealizados++;
-          cambiosDetalle.push(`Fila ${idx + 1}: ${getColumnName(col)} = "${valor}"`);
-        }
+    const fila = document.querySelector(`#tablaPoligonos tbody tr[data-index="${idx}"]`);
+    const inputs = fila.querySelectorAll('input');
+    
+    Object.keys(valores).forEach(col => {
+      if(valores[col] !== '') {
+        inputs[col].value = valores[col];
+        cambios++;
       }
     });
   });
 
-  $('#edicion-masiva input[type="text"]').val('');
-  $('#edit-color').val('#000000');
-
-  if(cambiosRealizados > 0) {
-    const mensaje = `✅ Se realizaron ${cambiosRealizados} cambios en ${seleccionados.size} registros seleccionados.\n\nDetalles de cambios:\n${cambiosDetalle.slice(0, 10).join('\n')}${cambiosDetalle.length > 10 ? '\n... y más cambios.' : ''}`;
-    alert(mensaje);
-  } else {
-    alert('ℹ️ No se realizaron cambios. Verifique que haya ingresado valores en los campos de edición.');
-  }
+  document.querySelectorAll('#edicion-masiva input').forEach(inp => inp.value = '');
+  alert(`✅ ${cambios} cambios realizados`);
 });
 
-function getColumnName(col) {
-  const nombres = {
-    '1': 'Nombre',
-    '2': 'Has',
-    '3': 'Status',
-    '4': 'Status1',
-    '5': 'Status2',
-    '6': 'Status3',
-    '7': 'Partido',
-    '8': 'Color'
-  };
-  return nombres[col] || 'Campo';
-}
+document.querySelectorAll('#filtros input').forEach(input => {
+  input.addEventListener('keyup', function() {
+    const filtros = {};
+    document.querySelectorAll('#filtros input').forEach(inp => {
+      const col = parseInt(inp.getAttribute('data-col'));
+      const val = inp.value.toUpperCase().trim();
+      if(val) filtros[col] = val;
+    });
 
-$('#filtros input').on('keyup change', function() {
-  const filtros = {};
-  $('#filtros input').each(function() {
-    const col = $(this).data('col');
-    const val = $(this).val().toUpperCase().trim();
-    if (val) filtros[col] = val;
-  });
-
-  table.rows().every(function() {
-    const row = $(this.node());
-    let mostrar = true;
-
-    for (const col in filtros) {
-      const cellVal = row.find('td').eq(col).find('input').val().toUpperCase();
-      if (!cellVal.includes(filtros[col])) {
-        mostrar = false;
-        break;
-      }
-    }
-    if (mostrar) row.show(); else row.hide();
+    document.querySelectorAll('#tablaPoligonos tbody tr').forEach(row => {
+      let show = true;
+      Object.keys(filtros).forEach(col => {
+        const cellVal = row.querySelectorAll('input')[col].value.toUpperCase();
+        if(!cellVal.includes(filtros[col])) show = false;
+      });
+      row.style.display = show ? '' : 'none';
+    });
   });
 });
 
@@ -558,46 +501,51 @@ header.addEventListener("mousedown",(e)=>{ dragging=true; offsetX=e.clientX-tabl
 document.addEventListener("mouseup",()=>dragging=false);
 document.addEventListener("mousemove",(e)=>{ if(!dragging) return; tabla.style.left=(e.clientX-offsetX)+"px"; tabla.style.top=(e.clientY-offsetY)+"px"; });
 
-$('#btn-grabar').on('click',()=>{ $('#menu-grabar').toggle(); });
-$(document).on('click',function(e){
-  if(!$(e.target).closest('#btn-grabar, #menu-grabar').length){ $('#menu-grabar').hide(); }
+document.getElementById('btn-grabar').addEventListener('click',()=>{ 
+  document.getElementById('menu-grabar').style.display = 
+    document.getElementById('menu-grabar').style.display === 'block' ? 'none' : 'block';
+});
+
+document.addEventListener('click',function(e){
+  if(!e.target.closest('#btn-grabar') && !e.target.closest('#menu-grabar')){ 
+    document.getElementById('menu-grabar').style.display = 'none';
+  }
 });
 
 function obtenerDatos(){
   const filas = [];
-  table.rows().every(function() {
-    const row = $(this.node());
-    const idx = getFilaIndex(row);
-    const inputs = row.find('input');
+  document.querySelectorAll('#tablaPoligonos tbody tr').forEach(tr => {
+    const idx = getFilaIndex(tr);
+    const inputs = tr.querySelectorAll('input');
     let coords = [];
     if(leafletPoligonos[idx]){
       coords = leafletPoligonos[idx].getLatLngs()[0].map(p => `${p.lng},${p.lat}`).join(" ");
     }
     filas.push({
-      name: inputs.eq(1).val(),
-      superficie: inputs.eq(2).val(),
-      status: inputs.eq(3).val(),
-      status1: inputs.eq(4).val(),
-      status2: inputs.eq(5).val(),
-      status3: inputs.eq(6).val(),
-      partido: inputs.eq(7).val(),
-      color: inputs.eq(8).val(),
+      name: inputs[1].value,
+      superficie: inputs[2].value,
+      status: inputs[3].value,
+      status1: inputs[4].value,
+      status2: inputs[5].value,
+      status3: inputs[6].value,
+      partido: inputs[7].value,
+      color: inputs[8].value,
       COORDENADAS: coords
     });
   });
   return filas;
 }
 
-$('#opcion-grabar').on('click',()=>{
+document.getElementById('opcion-grabar').addEventListener('click',()=>{
   fetch('/guardar', {
     method:'POST',
     headers:{'Content-Type':'application/json'},
     body:JSON.stringify({datos: obtenerDatos()})
-  }).then(r=>r.json()).then(resp=>alert(resp.mensaje || 'Datos guardados.'));
-  $('#menu-grabar').hide();
+  }).then(r=>r.json()).then(resp=>alert(resp.mensaje || 'Guardado'));
+  document.getElementById('menu-grabar').style.display = 'none';
 });
 
-$('#opcion-grabar-como').off('click').on('click', async ()=>{
+document.getElementById('opcion-grabar-como').addEventListener('click', async ()=>{
   const fecha = new Date();
   const dd = String(fecha.getDate()).padStart(2,'0');
   const mm = String(fecha.getMonth()+1).padStart(2,'0');
@@ -606,48 +554,46 @@ $('#opcion-grabar-como').off('click').on('click', async ()=>{
   const min = String(fecha.getMinutes()).padStart(2,'0');
   const sugerido = `poligonos_${dd}-${mm}-${aa}_${hh}-${min}.xlsx`;
 
-  let nuevoNombre = prompt("Ingrese nombre del nuevo archivo (sin extensión o con .xlsx):", sugerido);
-  if(nuevoNombre === null){ $('#menu-grabar').hide(); return; }
-  nuevoNombre = nuevoNombre.trim();
-  if(nuevoNombre.length === 0){ alert("Debe ingresar un nombre válido."); return; }
-  if(!nuevoNombre.toLowerCase().endsWith('.xlsx')){ nuevoNombre += '.xlsx'; }
+  let nuevoNombre = prompt("Nombre del archivo:", sugerido);
+  if(!nuevoNombre) { document.getElementById('menu-grabar').style.display = 'none'; return; }
+  if(!nuevoNombre.endsWith('.xlsx')) nuevoNombre += '.xlsx';
 
   try {
-    const payload = { datos: obtenerDatos(), nuevo_nombre: nuevoNombre };
     const resp = await fetch('/guardar_como', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify(payload)
+      body: JSON.stringify({datos: obtenerDatos(), nuevo_nombre: nuevoNombre})
     });
     const json = await resp.json();
-    if(json && json.mensaje) alert(json.mensaje);
-    else if(json.success) alert('Archivo guardado correctamente.');
-    else alert('Resultado desconocido al guardar.');
-  } catch (err) { alert('Error al guardar: ' + err); } finally { $('#menu-grabar').hide(); }
+    alert(json.mensaje || 'Guardado');
+  } catch (err) { 
+    alert('Error: ' + err); 
+  }
+  document.getElementById('menu-grabar').style.display = 'none';
 });
 
-$('#exportarPDF').on('click',()=>{
+document.getElementById('exportarPDF').addEventListener('click',()=>{
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF();
   const filasPDF = [];
   seleccionados.forEach(idx=>{
-    const fila = table.rows().nodes().to$().filter(`[data-index="${idx}"]`);
-    const inputs = fila.find('input');
+    const fila = document.querySelector(`#tablaPoligonos tbody tr[data-index="${idx}"]`);
+    const inputs = fila.querySelectorAll('input');
     filasPDF.push([
-      inputs.eq(0).prop('checked') ? 'X' : '',
-      inputs.eq(1).val(),
-      inputs.eq(2).val(),
-      inputs.eq(3).val(),
-      inputs.eq(4).val(),
-      inputs.eq(5).val(),
-      inputs.eq(6).val(),
-      inputs.eq(7).val(),
-      inputs.eq(8).val()
+      inputs[0].checked ? 'X' : '',
+      inputs[1].value,
+      inputs[2].value,
+      inputs[3].value,
+      inputs[4].value,
+      inputs[5].value,
+      inputs[6].value,
+      inputs[7].value,
+      inputs[8].value
     ]);
   });
-  if(filasPDF.length===0){ alert("No hay registros seleccionados para exportar."); return; }
+  if(filasPDF.length===0){ alert("Seleccione registros"); return; }
   doc.autoTable({
-    head: [['Sel','Nombre Productor','Has','Status','Status1','Status2','Status3','Ptdo','Color']],
+    head: [['Sel','Nombre','Has','Status','Status1','Status2','Status3','Ptdo','Color']],
     body: filasPDF,
     theme: 'grid',
     styles: {fontSize:8},
@@ -657,19 +603,11 @@ $('#exportarPDF').on('click',()=>{
 });
 
 document.getElementById("btnLimpiar").addEventListener("click", function() {
-    document.querySelectorAll("#filtros input[type='text']").forEach(input => {
-        input.value = "";
-    });
-
-    document.querySelectorAll("#edicion-masiva input[type='text']").forEach(input => {
-        input.value = "";
-    });
-
-    $("#tablaPoligonos tbody tr").show();
-
+    document.querySelectorAll("#filtros input").forEach(input => input.value = "");
+    document.querySelectorAll("#edicion-masiva input").forEach(input => input.value = "");
+    document.querySelectorAll("#tablaPoligonos tbody tr").forEach(tr => tr.style.display = '');
     document.getElementById("colorBloque").value = "";
-
-    alert("Filtros y campos de edición limpiados.");
+    alert("Limpiado");
 });
 
 </script>
