@@ -421,6 +421,40 @@ def guardar_como():
     except Exception as e:
         print(f"❌ Error en /guardar_como: {e}")
         return jsonify({"success": False, "mensaje": f"❌ Error: {str(e)}"})
+    
+@app.route("/test_r2")
+def test_r2():
+    resultado = []
+    resultado.append(f"ES_LOCAL: {ES_LOCAL}")
+    resultado.append(f"MODO_R2: {MODO_R2}")
+    resultado.append(f"R2_BUCKET: {R2_BUCKET}")
+    resultado.append(f"R2_ENDPOINT: {R2_ENDPOINT[:50]}..." if R2_ENDPOINT else "None")
+    resultado.append(f"R2_ACCESS_KEY existe: {bool(R2_ACCESS_KEY)}")
+    resultado.append(f"R2_SECRET_KEY existe: {bool(R2_SECRET_KEY)}")
+    
+    if not MODO_R2:
+        resultado.append("<br><strong>❌ No está en modo R2</strong>")
+        return "<br>".join(resultado)
+    
+    try:
+        resultado.append("<br><strong>Intentando conectar a R2...</strong>")
+        resp = r2_client.list_objects_v2(Bucket=R2_BUCKET, MaxKeys=50)
+        archivos = [obj["Key"] for obj in resp.get("Contents", [])]
+        resultado.append(f"<br>✅ Conexión exitosa - Archivos encontrados: {len(archivos)}")
+        
+        if archivos:
+            resultado.append("<br><strong>Archivos en R2:</strong>")
+            for arch in archivos[:20]:  # Primeros 20
+                resultado.append(f"  • {arch}")
+            if len(archivos) > 20:
+                resultado.append(f"  ... y {len(archivos) - 20} más")
+        else:
+            resultado.append("<br>⚠️ No hay archivos en el bucket")
+            
+    except Exception as e:
+        resultado.append(f"<br><strong>❌ Error conectando a R2:</strong><br>{str(e)}")
+    
+    return "<br>".join(resultado)
 
 if __name__ == "__main__":
     if not ES_LOCAL and not MODO_R2:
