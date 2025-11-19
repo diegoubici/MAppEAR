@@ -173,6 +173,91 @@ tr.seleccionado { background-color:#FFFF99 !important; }
 .menu-grabar div { padding:8px 12px; font-size:11px; cursor:pointer; }
 .menu-grabar div:hover { background:#f0f0f0; }
 
+/* === TOAST NOTIFICATIONS === */
+.toast {
+  position: fixed;
+  bottom: 30px;
+  right: 30px;
+  min-width: 320px;
+  max-width: 450px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+  padding: 0;
+  z-index: 10000;
+  animation: slideIn 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+}
+
+.toast.hiding {
+  animation: slideOut 0.3s ease-in forwards;
+}
+
+.toast-header {
+  padding: 16px 20px;
+  font-weight: 600;
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid rgba(0,0,0,0.08);
+}
+
+.toast-body {
+  padding: 14px 20px;
+  font-size: 13px;
+  color: #555;
+  line-height: 1.5;
+}
+
+.toast-icon {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.toast.success .toast-header {
+  background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+  color: white;
+}
+
+.toast.error .toast-header {
+  background: linear-gradient(135deg, #eb3349 0%, #f45c43 100%);
+  color: white;
+}
+
+.toast.warning .toast-header {
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  color: white;
+}
+
+.toast.info .toast-header {
+  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+  color: white;
+}
+
+@keyframes slideIn {
+  from { 
+    transform: translateX(450px) scale(0.8);
+    opacity: 0;
+  }
+  to { 
+    transform: translateX(0) scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes slideOut {
+  from { 
+    transform: translateX(0) scale(1);
+    opacity: 1;
+  }
+  to { 
+    transform: translateX(450px) scale(0.8);
+    opacity: 0;
+  }
+}
+
 </style>
 </head>
 <body>
@@ -303,6 +388,34 @@ poligonos.forEach((p, idx)=>{
   } else leafletPoligonos.push(null);
 });
 
+// === FUNCIÓN TOAST ===
+function mostrarToast(titulo, detalle, tipo = 'success') {
+  const iconos = {
+    success: '✓',
+    error: '✗',
+    warning: '⚠',
+    info: 'ℹ'
+  };
+
+  const toast = document.createElement('div');
+  toast.className = `toast ${tipo}`;
+  
+  toast.innerHTML = `
+    <div class="toast-header">
+      <span class="toast-icon">${iconos[tipo]}</span>
+      <span>${titulo}</span>
+    </div>
+    <div class="toast-body">${detalle}</div>
+  `;
+  
+  document.body.appendChild(toast);
+  
+  setTimeout(() => {
+    toast.classList.add('hiding');
+    setTimeout(() => toast.remove(), 300);
+  }, 3000);
+}
+
 // ORDENAMIENTO SIMPLE
 let lastSortCol = null;
 let sortAsc = true;
@@ -310,7 +423,7 @@ let sortAsc = true;
 document.querySelectorAll('th.sortable').forEach(th => {
     th.addEventListener('click', function() {
         if(seleccionados.size === 0) {
-            alert('⚠️ Seleccione al menos un registro para ordenar');
+            mostrarToast('Atención', 'Debe seleccionar al menos un registro para ordenar', 'warning');
             return;
         }
         
@@ -372,7 +485,11 @@ function sortSelected(colIdx, ascending) {
         if(leafletPoligonos[idx]) leafletPoligonos[idx].setStyle({weight:2});
     });
     
-    alert(`✅ ${selected.length} registros ordenados ${ascending ? 'ASC ▲' : 'DESC ▼'}`);
+    mostrarToast(
+        'Ordenamiento completado',
+        `${selected.length} registros ordenados ${ascending ? 'ascendente ▲' : 'descendente ▼'}`,
+        'info'
+    );
 }
 
 function getFilaIndex(row) {
@@ -420,30 +537,45 @@ document.querySelector('#tablaPoligonos tbody').addEventListener('change', funct
 
 document.getElementById('aplicarColor').addEventListener('click', ()=>{
   const color = document.getElementById('colorBloque').value;
-  if(!color) return;
+  if(!color) {
+    mostrarToast('Atención', 'Debe seleccionar un color primero', 'warning');
+    return;
+  }
+  
+  let count = 0;
   seleccionados.forEach(idx=>{
     const fila = document.querySelector(`#tablaPoligonos tbody tr[data-index="${idx}"]`);
     fila.querySelector('input.colorInput').value = color;
     if(leafletPoligonos[idx]) leafletPoligonos[idx].setStyle({fillColor:color});
+    count++;
   });
+  
+  mostrarToast('Color aplicado', `Color aplicado a ${count} registros`, 'success');
 });
 
 document.getElementById('seleccionarFiltrados').addEventListener('click', ()=>{
+  let count = 0;
   document.querySelectorAll('#tablaPoligonos tbody tr').forEach(tr => {
     if(tr.style.display !== 'none') {
       const idx = getFilaIndex(tr);
-      if(!seleccionados.has(idx)) toggleSeleccion(idx);
+      if(!seleccionados.has(idx)) {
+        toggleSeleccion(idx);
+        count++;
+      }
     }
   });
+  mostrarToast('Selección completada', `${count} registros seleccionados`, 'info');
 });
 
 document.getElementById('deseleccionarTodos').addEventListener('click', ()=>{ 
-  Array.from(seleccionados).forEach(idx=> toggleSeleccion(idx)); 
+  const count = seleccionados.size;
+  Array.from(seleccionados).forEach(idx=> toggleSeleccion(idx));
+  mostrarToast('Deselección completada', `${count} registros deseleccionados`, 'info');
 });
 
 document.getElementById('editarColumnas').addEventListener('click', function(){
   if(seleccionados.size === 0){
-    alert('Debe seleccionar al menos un registro');
+    mostrarToast('Atención', 'Debe seleccionar al menos un registro para editar', 'warning');
     return;
   }
 
@@ -471,7 +603,12 @@ document.getElementById('editarColumnas').addEventListener('click', function(){
   });
 
   document.querySelectorAll('#edicion-masiva input').forEach(inp => inp.value = '');
-  alert(`✅ ${cambios} cambios realizados`);
+  
+  if(cambios > 0) {
+    mostrarToast('Edición completada', `${cambios} cambios realizados en ${seleccionados.size} registros`, 'success');
+  } else {
+    mostrarToast('Sin cambios', 'No se ingresaron valores para editar', 'info');
+  }
 });
 
 document.querySelectorAll('#filtros input').forEach(input => {
@@ -541,7 +678,19 @@ document.getElementById('opcion-grabar').addEventListener('click',()=>{
     method:'POST',
     headers:{'Content-Type':'application/json'},
     body:JSON.stringify({datos: obtenerDatos()})
-  }).then(r=>r.json()).then(resp=>alert(resp.mensaje || 'Guardado'));
+  })
+  .then(r=>r.json())
+  .then(resp => {
+    if(resp.success) {
+      mostrarToast(resp.mensaje, resp.detalle || 'Operación completada', resp.tipo || 'success');
+    } else {
+      mostrarToast(resp.mensaje || 'Error', resp.detalle || 'No se pudo completar la operación', 'error');
+    }
+  })
+  .catch(err => {
+    mostrarToast('Error de conexión', 'No se pudo guardar el archivo', 'error');
+  });
+  
   document.getElementById('menu-grabar').style.display = 'none';
 });
 
@@ -555,7 +704,10 @@ document.getElementById('opcion-grabar-como').addEventListener('click', async ()
   const sugerido = `poligonos_${dd}-${mm}-${aa}_${hh}-${min}.xlsx`;
 
   let nuevoNombre = prompt("Nombre del archivo:", sugerido);
-  if(!nuevoNombre) { document.getElementById('menu-grabar').style.display = 'none'; return; }
+  if(!nuevoNombre) { 
+    document.getElementById('menu-grabar').style.display = 'none'; 
+    return; 
+  }
   if(!nuevoNombre.endsWith('.xlsx')) nuevoNombre += '.xlsx';
 
   try {
@@ -565,9 +717,14 @@ document.getElementById('opcion-grabar-como').addEventListener('click', async ()
       body: JSON.stringify({datos: obtenerDatos(), nuevo_nombre: nuevoNombre})
     });
     const json = await resp.json();
-    alert(json.mensaje || 'Guardado');
+    
+    if(json.success) {
+      mostrarToast(json.mensaje, json.detalle || 'Archivo guardado', json.tipo || 'success');
+    } else {
+      mostrarToast(json.mensaje || 'Error', json.detalle || 'No se pudo guardar', 'error');
+    }
   } catch (err) { 
-    alert('Error: ' + err); 
+    mostrarToast('Error de conexión', 'No se pudo guardar el archivo', 'error');
   }
   document.getElementById('menu-grabar').style.display = 'none';
 });
@@ -591,7 +748,12 @@ document.getElementById('exportarPDF').addEventListener('click',()=>{
       inputs[8].value
     ]);
   });
-  if(filasPDF.length===0){ alert("Seleccione registros"); return; }
+  
+  if(filasPDF.length===0){ 
+    mostrarToast('Atención', 'Debe seleccionar registros para exportar', 'warning');
+    return; 
+  }
+  
   doc.autoTable({
     head: [['Sel','Nombre','Has','Status','Status1','Status2','Status3','Ptdo','Color']],
     body: filasPDF,
@@ -600,6 +762,8 @@ document.getElementById('exportarPDF').addEventListener('click',()=>{
     margin: {top:10}
   });
   doc.save('poligonos.pdf');
+  
+  mostrarToast('PDF exportado', `${filasPDF.length} registros exportados correctamente`, 'success');
 });
 
 document.getElementById("btnLimpiar").addEventListener("click", function() {
@@ -607,9 +771,34 @@ document.getElementById("btnLimpiar").addEventListener("click", function() {
     document.querySelectorAll("#edicion-masiva input").forEach(input => input.value = "");
     document.querySelectorAll("#tablaPoligonos tbody tr").forEach(tr => tr.style.display = '');
     document.getElementById("colorBloque").value = "";
-    alert("Limpiado");
+    
+    mostrarToast('Limpieza completada', 'Filtros y campos de edición limpiados', 'info');
 });
 
 </script>
 </body>
 </html>
+```
+
+---
+
+## 🎉 **Listo para usar!**
+
+Ahora cuando guardes verás:
+
+### **En LOCAL:**
+```
+┌─────────────────────────────────────┐
+│ ✓ GRABACIÓN EXITOSA LOCALMENTE     │
+├─────────────────────────────────────┤
+│ Archivo guardado en su computadora  │
+└─────────────────────────────────────┘
+```
+
+### **En RENDER (R2):**
+```
+┌─────────────────────────────────────┐
+│ ✓ GRABACIÓN EXITOSA EN R2           │
+├─────────────────────────────────────┤
+│ Archivo sincronizado en la nube     │
+└─────────────────────────────────────┘

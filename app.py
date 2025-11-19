@@ -373,11 +373,11 @@ def abrir_archivo(nombre):
 @app.route("/guardar", methods=["POST"])
 def guardar():
     if "usuario" not in session:
-        return jsonify({"success": False, "mensaje": "No autenticado."}), 401
+        return jsonify({"success": False, "mensaje": "No autenticado.", "tipo": "error"}), 401
     
     archivo_sel = session.get("archivo_seleccionado")
     if not archivo_sel:
-        return jsonify({"success": False, "mensaje": "No hay archivo seleccionado."})
+        return jsonify({"success": False, "mensaje": "No hay archivo seleccionado.", "tipo": "error"})
     
     try:
         data = request.get_json(force=True)
@@ -386,18 +386,40 @@ def guardar():
         exito = guardar_poligonos(data["datos"], user, archivo_sel)
         
         if exito:
-            modo = "LOCAL" if ES_LOCAL else "R2"
-            return jsonify({"success": True, "mensaje": f"✅ Cambios guardados correctamente en {modo}."})
+            if ES_LOCAL:
+                return jsonify({
+                    "success": True, 
+                    "mensaje": "GRABACIÓN EXITOSA LOCALMENTE",
+                    "detalle": "Archivo guardado en su computadora",
+                    "tipo": "success"
+                })
+            else:
+                return jsonify({
+                    "success": True, 
+                    "mensaje": "GRABACIÓN EXITOSA EN R2",
+                    "detalle": "Archivo sincronizado en la nube",
+                    "tipo": "success"
+                })
         else:
-            return jsonify({"success": False, "mensaje": "❌ Error al guardar."})
+            return jsonify({
+                "success": False, 
+                "mensaje": "Error al guardar",
+                "detalle": "No se pudo completar la operación",
+                "tipo": "error"
+            })
     except Exception as e:
         print(f"❌ Error en /guardar: {e}")
-        return jsonify({"success": False, "mensaje": f"❌ Error: {e}"})
+        return jsonify({
+            "success": False, 
+            "mensaje": "Error al guardar",
+            "detalle": str(e),
+            "tipo": "error"
+        })
 
 @app.route("/guardar_como", methods=["POST"])
 def guardar_como():
     if "usuario" not in session:
-        return jsonify({"success": False, "mensaje": "No autenticado."}), 401
+        return jsonify({"success": False, "mensaje": "No autenticado.", "tipo": "error"}), 401
     
     try:
         contenido = request.get_json(force=True)
@@ -405,7 +427,11 @@ def guardar_como():
         nuevo_nombre = contenido.get("nuevo_nombre", "").strip()
         
         if not nuevo_nombre:
-            return jsonify({"success": False, "mensaje": "⚠️ No se indicó nombre."})
+            return jsonify({
+                "success": False, 
+                "mensaje": "Nombre de archivo requerido",
+                "tipo": "warning"
+            })
         
         if not nuevo_nombre.lower().endswith(".xlsx"):
             nuevo_nombre += ".xlsx"
@@ -414,13 +440,34 @@ def guardar_como():
         exito = guardar_poligonos(datos, user, nuevo_nombre)
         
         if exito:
-            modo = "LOCAL" if ES_LOCAL else "R2"
-            return jsonify({"success": True, "mensaje": f"✅ Archivo '{nuevo_nombre}' guardado en {modo}."})
+            if ES_LOCAL:
+                return jsonify({
+                    "success": True, 
+                    "mensaje": "GRABACIÓN EXITOSA LOCALMENTE",
+                    "detalle": f"Archivo '{nuevo_nombre}' guardado",
+                    "tipo": "success"
+                })
+            else:
+                return jsonify({
+                    "success": True, 
+                    "mensaje": "GRABACIÓN EXITOSA EN R2",
+                    "detalle": f"Archivo '{nuevo_nombre}' sincronizado",
+                    "tipo": "success"
+                })
         else:
-            return jsonify({"success": False, "mensaje": "❌ Error al guardar archivo."})
+            return jsonify({
+                "success": False, 
+                "mensaje": "Error al guardar archivo",
+                "tipo": "error"
+            })
     except Exception as e:
         print(f"❌ Error en /guardar_como: {e}")
-        return jsonify({"success": False, "mensaje": f"❌ Error: {str(e)}"})
+        return jsonify({
+            "success": False, 
+            "mensaje": "Error al guardar",
+            "detalle": str(e),
+            "tipo": "error"
+        })
     
 @app.route("/test_r2")
 def test_r2():
@@ -444,7 +491,7 @@ def test_r2():
         
         if archivos:
             resultado.append("<br><strong>Archivos en R2:</strong>")
-            for arch in archivos[:20]:  # Primeros 20
+            for arch in archivos[:20]:
                 resultado.append(f"  • {arch}")
             if len(archivos) > 20:
                 resultado.append(f"  ... y {len(archivos) - 20} más")
