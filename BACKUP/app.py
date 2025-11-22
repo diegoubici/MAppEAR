@@ -1,43 +1,55 @@
 import os
+import io
 import pandas as pd
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session
 import boto3
-from io import BytesIO
+from botocore.exceptions import ClientError
 
-# === CLOUDFLARE R2 CONFIGURATION ===
+# Cargar variables de entorno desde archivo .env (solo en local)
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+    print("✅ Archivo .env cargado (desarrollo local)")
+except ImportError:
+    print("ℹ️ python-dotenv no instalado (modo producción)")
+
+# === CONFIG (lee todo desde variables de entorno) ===
 R2_ACCESS_KEY = os.getenv("R2_ACCESS_KEY")
 R2_SECRET_KEY = os.getenv("R2_SECRET_KEY")
 R2_BUCKET = os.getenv("R2_BUCKET")
 R2_ENDPOINT = os.getenv("R2_ENDPOINT")
+FLASK_SECRET_KEY = os.getenv("FLASK_SECRET_KEY", "BanfiClaveSegura123")
 
-# Detectar si estamos en modo Render (con R2) o Local
-MODO_R2 = all([R2_ACCESS_KEY, R2_SECRET_KEY, R2_BUCKET, R2_ENDPOINT])
+# Detectar si estamos en LOCAL o PRODUCCIÓN
+ES_LOCAL = os.path.exists('.env')  # Si existe .env, estamos en local
+DATA_DIR = os.path.join(os.path.dirname(__file__), 'data')  # C:\MAppEAR\data
 
-if MODO_R2:
-    print("🌐 MODO: RENDER/R2 (usando Cloudflare R2)")
+# Verificar configuración
+MODO_R2 = all([R2_ACCESS_KEY, R2_SECRET_KEY, R2_BUCKET, R2_ENDPOINT]) and not ES_LOCAL
+
+if ES_LOCAL:
+    print("🖥️ MODO: LOCAL - usando carpeta C:\\MAppEAR\\data")
+    if not os.path.exists(DATA_DIR):
+        os.makedirs(DATA_DIR)
+        print(f"📁 Carpeta creada: {DATA_DIR}")
+    r2_client = None
+elif MODO_R2:
+    print("🌐 MODO: R2 (Cloudflare R2) - leyendo y guardando exclusivamente en R2")
     r2_client = boto3.client(
         "s3",
         endpoint_url=R2_ENDPOINT,
         aws_access_key_id=R2_ACCESS_KEY,
         aws_secret_access_key=R2_SECRET_KEY
     )
-    BASE_DIR = "/tmp"
 else:
-    print("🖥️  MODO: LOCAL (usando carpetas locales)")
-    if os.path.exists(r"C:\MAPPEAR"):
-        BASE_DIR = r"C:\MAPPEAR\data"
-    elif os.path.exists(r"F:\MAPPEAR"):
-        BASE_DIR = r"F:\MAPPEAR\data"
-    else:
-        BASE_DIR = os.path.join(os.getcwd(), "data")
-
-os.makedirs(BASE_DIR, exist_ok=True)
-print(f"📁 BASE_DIR: {BASE_DIR}")
+    print("⚠️ R2 no está configurado completamente. El programa no funcionará sin R2.")
+    r2_client = None
 
 # === FLASK APP ===
 app = Flask(__name__)
-app.secret_key = "BanfiClaveSegura123"
+app.secret_key = FLASK_SECRET_KEY
 
+# Usuarios
 USERS = {
     "DSUBICI": {"password": "Banfi138", "rol": "admin"},
     "usuario1": {"password": "contraseña1", "rol": "user"},
@@ -47,216 +59,264 @@ USERS = {
     "RIVADAVIA": {"password": "rivadavia5", "rol": "user"},
 }
 
-# === FUNCIONES R2 ===
-def listar_archivos_r2(usuario):
-    """Lista archivos .xlsx del usuario en R2"""
-    try:
-        prefix = f"{usuario}/"
-        response = r2_client.list_objects_v2(Bucket=R2_BUCKET, Prefix=prefix)
-        
-        archivos = []
-        if "Contents" in response:
-            for obj in response["Contents"]:
-                nombre = obj["Key"]
-                if nombre.lower().endswith(".xlsx") and "/" in nombre:
-                    archivos.append(nombre.split("/", 1)[1])  # Quitar prefijo usuario/
-        
-        print(f"📄 Archivos R2 encontrados para {usuario}: {archivos}")
-        return sorted(archivos)
-    except Exception as e:
-        print(f"❌ Error listando archivos R2: {e}")
+# === UTILIDADES LOCALES ===
+
+def listar_archivos_local(usuario):
+    """Lista archivos .xlsx en la carpeta data/usuario/"""
+    usuario_dir = os.path.join(DATA_DIR, usuario)
+    if not os.path.exists(usuario_dir):
+        os.makedirs(usuario_dir)
+        print(f"📁 Carpeta creada: {usuario_dir}")
         return []
+    
+    archivos = [f for f in os.listdir(usuario_dir) if f.lower().endswith('.xlsx')]
+    archivos = sorted(archivos)
+    print(f"📄 Archivos encontrados en {usuario_dir}: {archivos}")
+    return archivos
 
-
-def descargar_de_r2(usuario, nombre_archivo):
-    """Descarga archivo desde R2"""
+def leer_archivo_local(usuario, nombre_archivo):
+    """Lee un archivo local y devuelve un BytesIO"""
+    ruta = os.path.join(DATA_DIR, usuario, nombre_archivo)
+    if not os.path.exists(ruta):
+        print(f"❌ Archivo no encontrado: {ruta}")
+        return None
+    
     try:
-        key = f"{usuario}/{nombre_archivo}"
-        response = r2_client.get_object(Bucket=R2_BUCKET, Key=key)
-        data = response["Body"].read()
-        
-        ruta_local = os.path.join(BASE_DIR, nombre_archivo)
-        with open(ruta_local, "wb") as f:
-            f.write(data)
-        
-        print(f"⬇️ Archivo '{nombre_archivo}' descargado de R2")
-        return ruta_local
+        with open(ruta, 'rb') as f:
+            data = f.read()
+        bio = io.BytesIO(data)
+        print(f"✅ Leído {len(data)} bytes de {ruta}")
+        return bio
     except Exception as e:
-        print(f"❌ Error descargando de R2: {e}")
+        print(f"❌ Error leyendo archivo local: {e}")
         return None
 
-
-def subir_a_r2(usuario, ruta_local):
-    """Sube archivo a R2"""
+def guardar_archivo_local(usuario, nombre_archivo, bytes_data):
+    """Guarda bytes en archivo local"""
+    usuario_dir = os.path.join(DATA_DIR, usuario)
+    if not os.path.exists(usuario_dir):
+        os.makedirs(usuario_dir)
+    
+    ruta = os.path.join(usuario_dir, nombre_archivo)
     try:
-        nombre_archivo = os.path.basename(ruta_local)
-        key = f"{usuario}/{nombre_archivo}"
-        
-        with open(ruta_local, "rb") as f:
-            r2_client.put_object(
-                Bucket=R2_BUCKET,
-                Key=key,
-                Body=f.read(),
-                ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
-        
-        print(f"✅ Archivo '{nombre_archivo}' subido a R2")
+        with open(ruta, 'wb') as f:
+            f.write(bytes_data)
+        print(f"✅ Guardado {len(bytes_data)} bytes en {ruta}")
         return True
     except Exception as e:
-        print(f"❌ Error subiendo a R2: {e}")
+        print(f"❌ Error guardando archivo local: {e}")
         return False
 
+# === UTILIDADES R2 ===
 
-# === FUNCIONES LOCALES ===
-def listar_archivos_local(usuario):
-    """Lista archivos en carpeta local"""
+def listar_archivos_r2(usuario):
+    """Lista archivos .xlsx dentro del prefijo usuario/ en R2."""
+    if not MODO_R2:
+        print("❌ R2 no configurado, no se pueden listar archivos")
+        return []
+    prefix = f"{usuario}/"
     try:
-        user_dir = os.path.join(BASE_DIR, usuario)
-        os.makedirs(user_dir, exist_ok=True)
-        
-        archivos = [f for f in os.listdir(user_dir) if f.lower().endswith(".xlsx")]
-        print(f"📄 Archivos locales encontrados para {usuario}: {archivos}")
-        return sorted(archivos)
+        resp = r2_client.list_objects_v2(Bucket=R2_BUCKET, Prefix=prefix)
+        archivos = []
+        for obj in resp.get("Contents", []):
+            key = obj["Key"]
+            if key.lower().endswith(".xlsx"):
+                nombre = key.split("/", 1)[1] if "/" in key else key
+                if nombre:
+                    archivos.append(nombre)
+        archivos = sorted(archivos)
+        print(f"📄 Archivos encontrados en R2/{usuario}: {archivos}")
+        return archivos
+    except ClientError as e:
+        print(f"❌ Error listando en R2: {e}")
+        return []
     except Exception as e:
-        print(f"❌ Error listando archivos locales: {e}")
+        print(f"❌ Excepción listar_archivos_r2: {e}")
         return []
 
-
-def obtener_archivo_local(usuario, nombre_archivo):
-    """Obtiene ruta de archivo local"""
+def descargar_de_r2_a_bytesio(usuario, nombre_archivo):
+    """Descarga el archivo desde R2 y devuelve un BytesIO con el contenido."""
+    if not MODO_R2:
+        print("❌ R2 no configurado, no se puede descargar")
+        return None
+    key = f"{usuario}/{nombre_archivo}"
     try:
-        user_dir = os.path.join(BASE_DIR, usuario)
-        ruta_archivo = os.path.join(user_dir, nombre_archivo)
-        
-        if os.path.exists(ruta_archivo):
-            print(f"✅ Archivo local encontrado: {ruta_archivo}")
-            return ruta_archivo
-        else:
-            print(f"❌ Archivo local no encontrado: {ruta_archivo}")
-            return None
+        print(f"📥 Descargando de R2: {key}")
+        resp = r2_client.get_object(Bucket=R2_BUCKET, Key=key)
+        data = resp["Body"].read()
+        bio = io.BytesIO(data)
+        print(f"✅ Descargado {len(data)} bytes de {key}")
+        return bio
+    except ClientError as e:
+        print(f"❌ Error al descargar {key} de R2: {e}")
+        return None
     except Exception as e:
-        print(f"❌ Error obteniendo archivo local: {e}")
+        print(f"❌ Excepción descargar_de_r2_a_bytesio: {e}")
         return None
 
-
-# === FUNCIONES UNIFICADAS ===
-def listar_archivos_r2(usuario):
-    """Lista archivos .xlsx del usuario en R2"""
+def subir_bytes_a_r2(usuario, nombre_archivo, bytes_data):
+    """Sube el contenido (bytes) a R2 en la key usuario/nombre_archivo"""
+    if not MODO_R2:
+        print("❌ R2 no configurado, no se puede subir")
+        return False
+    key = f"{usuario}/{nombre_archivo}"
     try:
-        if not all([R2_ACCESS_KEY, R2_SECRET_KEY, R2_BUCKET, R2_ENDPOINT]):
-            print("⚠️ Configuración R2 incompleta, usando lista vacía")
-            return []
-        
-        prefix = f"{usuario}/"
-        print(f"🔍 Listando archivos R2 con prefix: {prefix}")
-        
-        response = r2_client.list_objects_v2(Bucket=R2_BUCKET, Prefix=prefix)
-        
-        archivos = []
-        if "Contents" in response:
-            for obj in response["Contents"]:
-                nombre = obj["Key"]
-                # Solo archivos .xlsx, no carpetas vacías
-                if nombre.lower().endswith(".xlsx") and "/" in nombre:
-                    archivo_solo = nombre.split("/", 1)[1]  # Quitar prefijo usuario/
-                    if archivo_solo:  # No agregar strings vacíos
-                        archivos.append(archivo_solo)
-        
-        print(f"📄 Archivos R2 encontrados para {usuario}: {archivos}")
-        return sorted(archivos)
-    except Exception as e:
-        print(f"❌ Error listando archivos R2: {e}")
-        import traceback
-        print(traceback.format_exc())
-        return []  # Retornar lista vacía en caso de error
-
-
-def obtener_archivo(usuario, nombre_archivo):
-    """Obtiene archivo (R2 o local según modo)"""
-    if MODO_R2:
-        return descargar_de_r2(usuario, nombre_archivo)
-    else:
-        return obtener_archivo_local(usuario, nombre_archivo)
-
-
-def guardar_archivo(usuario, ruta_local):
-    """Guarda archivo (R2 o local según modo)"""
-    if MODO_R2:
-        return subir_a_r2(usuario, ruta_local)
-    else:
-        print(f"✅ Archivo guardado localmente: {ruta_local}")
+        print(f"📤 Subiendo a R2: {key} ({len(bytes_data)} bytes)")
+        r2_client.put_object(
+            Bucket=R2_BUCKET,
+            Key=key,
+            Body=bytes_data,
+            ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+        print(f"✅ Subido exitosamente a R2: {key}")
         return True
+    except ClientError as e:
+        print(f"❌ Error subiendo a R2 {key}: {e}")
+        return False
+    except Exception as e:
+        print(f"❌ Excepción subir_bytes_a_r2: {e}")
+        return False
+
+# === FUNCIONES UNIFICADAS (detectan automáticamente LOCAL o R2) ===
 
 def listar_archivos(usuario):
-    """Lista archivos según el modo (R2 o local)"""
-    if MODO_R2:
-        return listar_archivos_r2(usuario)
-    else:
+    """Lista archivos según el modo (LOCAL o R2)"""
+    if ES_LOCAL:
         return listar_archivos_local(usuario)
+    else:
+        return listar_archivos_r2(usuario)
 
+def leer_archivo(usuario, nombre_archivo):
+    """Lee archivo según el modo (LOCAL o R2)"""
+    if ES_LOCAL:
+        return leer_archivo_local(usuario, nombre_archivo)
+    else:
+        return descargar_de_r2_a_bytesio(usuario, nombre_archivo)
 
-# === FUNCIONES DE POLÍGONOS ===
-def cargar_poligonos(ruta_archivo):
-    df = pd.read_excel(ruta_archivo)
+def guardar_archivo(usuario, nombre_archivo, bytes_data):
+    """Guarda archivo según el modo (LOCAL o R2)"""
+    if ES_LOCAL:
+        return guardar_archivo_local(usuario, nombre_archivo, bytes_data)
+    else:
+        return subir_bytes_a_r2(usuario, nombre_archivo, bytes_data)
+
+# === Funciones de utilidad para colores ===
+
+def procesar_color_con_transparencia(color_hex):
+    """Procesa un color HEX y extrae el color base y la opacidad."""
+    if not color_hex or not isinstance(color_hex, str):
+        return {"color": "#CCCCCC", "opacity": 1.0}
+    
+    color_hex = str(color_hex).strip().upper()
+    
+    if not color_hex.startswith("#"):
+        color_hex = "#" + color_hex
+    
+    hex_sin_hash = color_hex[1:]
+    
+    if len(hex_sin_hash) == 8:
+        color_base = "#" + hex_sin_hash[:6]
+        alpha_hex = hex_sin_hash[6:8]
+        try:
+            alpha_decimal = int(alpha_hex, 16) / 255.0
+            opacity = round(alpha_decimal, 2)
+        except ValueError:
+            opacity = 1.0
+        return {"color": color_base, "opacity": opacity}
+    
+    elif len(hex_sin_hash) == 6:
+        return {"color": color_hex, "opacity": 1.0}
+    
+    elif len(hex_sin_hash) == 3:
+        r, g, b = hex_sin_hash
+        color_expandido = f"#{r}{r}{g}{g}{b}{b}"
+        return {"color": color_expandido, "opacity": 1.0}
+    
+    else:
+        print(f"⚠️ Formato de color inválido: {color_hex}, usando color por defecto")
+        return {"color": "#CCCCCC", "opacity": 1.0}
+
+# === Funciones de polígonos ===
+
+def cargar_poligonos_desde_bytesio(bio):
+    """Lee un pandas DataFrame desde un BytesIO y devuelve la estructura de polígonos."""
+    try:
+        df = pd.read_excel(bio, engine='openpyxl')
+        print(f"📊 Excel leído: {len(df)} filas")
+    except Exception as e:
+        print(f"❌ Error leyendo Excel desde bytes: {e}")
+        return []
+    
     columnas = ["NOMBRE", "SUPERFICIE", "STATUS", "STATUS1", "STATUS2", "STATUS3", "PARTIDO", "COLOR HEX", "COORDENADAS"]
     for col in columnas:
         if col not in df.columns:
             df[col] = ""
     
     poligonos = []
-    for _, fila in df.iterrows():
+    for idx, fila in df.iterrows():
         coords = []
         if pd.notna(fila["COORDENADAS"]) and fila["COORDENADAS"]:
             try:
                 puntos = str(fila["COORDENADAS"]).split(" ")
                 for p in puntos:
-                    lon, lat = map(float, p.split(","))
-                    coords.append([lat, lon])
-            except Exception:
+                    if "," in p:
+                        lon, lat = map(float, p.split(","))
+                        coords.append([lat, lon])
+            except Exception as e:
+                print(f"⚠️ Error parseando coordenadas en fila {idx}: {e}")
                 coords = []
         
+        color_original = str(fila["COLOR HEX"]) if pd.notna(fila["COLOR HEX"]) else "#CCCCCC"
+        color_info = procesar_color_con_transparencia(color_original)
+        
         poligonos.append({
-            "name": str(fila["NOMBRE"]),
-            "superficie": str(fila["SUPERFICIE"]),
-            "status": str(fila["STATUS"]),
-            "status1": str(fila["STATUS1"]),
-            "status2": str(fila["STATUS2"]),
-            "status3": str(fila["STATUS3"]),
-            "partido": str(fila["PARTIDO"]),
-            "color": str(fila["COLOR HEX"]) if pd.notna(fila["COLOR HEX"]) else "#CCCCCC",
+            "name": str(fila["NOMBRE"]) if pd.notna(fila["NOMBRE"]) else "",
+            "superficie": str(fila["SUPERFICIE"]) if pd.notna(fila["SUPERFICIE"]) else "",
+            "status": str(fila["STATUS"]) if pd.notna(fila["STATUS"]) else "",
+            "status1": str(fila["STATUS1"]) if pd.notna(fila["STATUS1"]) else "",
+            "status2": str(fila["STATUS2"]) if pd.notna(fila["STATUS2"]) else "",
+            "status3": str(fila["STATUS3"]) if pd.notna(fila["STATUS3"]) else "",
+            "partido": str(fila["PARTIDO"]) if pd.notna(fila["PARTIDO"]) else "",
+            "color": color_info["color"],
+            "opacity": color_info["opacity"],
+            "colorOriginal": color_original,
             "coords": coords,
             "COORDENADAS": str(fila["COORDENADAS"]) if pd.notna(fila["COORDENADAS"]) else ""
         })
     
+    print(f"✅ Procesados {len(poligonos)} polígonos")
     return poligonos
 
-
-def guardar_poligonos(nuevos_datos, ruta_destino):
+def guardar_poligonos(nuevos_datos, usuario, nombre_archivo):
+    """Crea un Excel en memoria desde nuevos_datos y lo guarda."""
     columnas = ["NOMBRE", "SUPERFICIE", "STATUS", "STATUS1", "STATUS2", "STATUS3", "PARTIDO", "COLOR HEX", "COORDENADAS"]
     
     df = pd.DataFrame([
         {
-            "NOMBRE": dato.get("name", ""),
-            "SUPERFICIE": dato.get("superficie", ""),
-            "STATUS": dato.get("status", ""),
-            "STATUS1": dato.get("status1", ""),
-            "STATUS2": dato.get("status2", ""),
-            "STATUS3": dato.get("status3", ""),
-            "PARTIDO": dato.get("partido", ""),
-            "COLOR HEX": dato.get("color", "#CCCCCC"),
-            "COORDENADAS": dato.get("COORDENADAS", "")
-        }
-        for dato in nuevos_datos
+            "NOMBRE": d.get("name", ""),
+            "SUPERFICIE": d.get("superficie", ""),
+            "STATUS": d.get("status", ""),
+            "STATUS1": d.get("status1", ""),
+            "STATUS2": d.get("status2", ""),
+            "STATUS3": d.get("status3", ""),
+            "PARTIDO": d.get("partido", ""),
+            "COLOR HEX": d.get("colorOriginal", d.get("color", "#CCCCCC")),
+            "COORDENADAS": d.get("COORDENADAS", "")
+        } for d in nuevos_datos
     ], columns=columnas)
     
-    df.to_excel(ruta_destino, index=False)
-
+    bio = io.BytesIO()
+    with pd.ExcelWriter(bio, engine="openpyxl") as writer:
+        df.to_excel(writer, index=False)
+    bio.seek(0)
+    
+    return guardar_archivo(usuario, nombre_archivo, bio.read())
 
 # === RUTAS ===
+
 @app.route("/", methods=["GET"])
 def login_page():
     return render_template("login.html")
-
 
 @app.route("/login", methods=["POST"])
 def login():
@@ -266,114 +326,189 @@ def login():
     if user and user["password"] == password:
         session["usuario"] = username
         session["rol"] = user["rol"]
+        print(f"✅ Login exitoso: {username}")
         return redirect(url_for("seleccionar_archivo"))
+    print(f"❌ Login fallido: {username}")
     return render_template("login.html", error="Usuario o contraseña incorrectos.")
-
 
 @app.route("/logout")
 def logout():
+    usuario = session.get("usuario", "Desconocido")
     session.clear()
-    return redirect("https://www.google.com.ar")
+    print(f"👋 Logout: {usuario}")
+    return redirect("/")
 
-
-@app.route("/inicio")
+@app.route("/inicio", methods=["GET"])
 def seleccionar_archivo():
     if "usuario" not in session:
         return redirect(url_for("login_page"))
     
     user = session["usuario"]
+    archivos = listar_archivos(user)
     
-    try:
-        archivos = listar_archivos(user)
-        print(f"✅ Listado exitoso para {user}: {len(archivos)} archivos")
-    except Exception as e:
-        print(f"❌ Error al listar archivos para {user}: {e}")
-        import traceback
-        print(traceback.format_exc())
-        archivos = []
-    
-    return render_template(
-        "seleccionar_archivo.html", 
-        archivos=archivos, 
-        usuario=user, 
-        rol=session.get("rol", "user")
-    )
+    return render_template("seleccionar_archivo.html", 
+                         archivos=archivos, 
+                         usuario=user, 
+                         rol=session.get("rol","user"))
 
 @app.route("/abrir/<nombre>")
 def abrir_archivo(nombre):
     if "usuario" not in session:
         return redirect(url_for("login_page"))
+    
     user = session["usuario"]
-    ruta_local = obtener_archivo(user, nombre)
-    if not ruta_local:
-        return f"No se pudo obtener '{nombre}'.", 404
+    bio = leer_archivo(user, nombre)
+    
+    if not bio:
+        return f"❌ No se pudo obtener '{nombre}'.", 404
+    
+    poligonos = cargar_poligonos_desde_bytesio(bio)
     session["archivo_seleccionado"] = nombre
-    poligonos = cargar_poligonos(ruta_local)
-    return render_template("mapa.html", usuario=user, rol=session["rol"], poligonos=poligonos)
-
+    
+    return render_template("mapa.html", 
+                         usuario=user, 
+                         rol=session.get("rol","user"), 
+                         poligonos=poligonos)
 
 @app.route("/guardar", methods=["POST"])
 def guardar():
+    if "usuario" not in session:
+        return jsonify({"success": False, "mensaje": "No autenticado.", "tipo": "error"}), 401
+    
     archivo_sel = session.get("archivo_seleccionado")
     if not archivo_sel:
-        return jsonify({"success": False, "mensaje": "No hay archivo seleccionado."})
+        return jsonify({"success": False, "mensaje": "No hay archivo seleccionado.", "tipo": "error"})
+    
     try:
         data = request.get_json(force=True)
         user = session.get("usuario")
         
-        if MODO_R2:
-            ruta = os.path.join(BASE_DIR, archivo_sel)
-        else:
-            user_dir = os.path.join(BASE_DIR, user)
-            os.makedirs(user_dir, exist_ok=True)
-            ruta = os.path.join(user_dir, archivo_sel)
+        exito = guardar_poligonos(data["datos"], user, archivo_sel)
         
-        guardar_poligonos(data["datos"], ruta)
-        guardar_archivo(user, ruta)
-        return jsonify({"success": True, "mensaje": "✅ Cambios guardados correctamente."})
+        if exito:
+            if ES_LOCAL:
+                return jsonify({
+                    "success": True, 
+                    "mensaje": "GRABACIÓN EXITOSA LOCALMENTE",
+                    "detalle": "Archivo guardado en su computadora",
+                    "tipo": "success"
+                })
+            else:
+                return jsonify({
+                    "success": True, 
+                    "mensaje": "GRABACIÓN EXITOSA EN R2",
+                    "detalle": "Archivo sincronizado en la nube",
+                    "tipo": "success"
+                })
+        else:
+            return jsonify({
+                "success": False, 
+                "mensaje": "Error al guardar",
+                "detalle": "No se pudo completar la operación",
+                "tipo": "error"
+            })
     except Exception as e:
-        return jsonify({"success": False, "mensaje": f"❌ Error: {e}"})
-
+        print(f"❌ Error en /guardar: {e}")
+        return jsonify({
+            "success": False, 
+            "mensaje": "Error al guardar",
+            "detalle": str(e),
+            "tipo": "error"
+        })
 
 @app.route("/guardar_como", methods=["POST"])
 def guardar_como():
+    if "usuario" not in session:
+        return jsonify({"success": False, "mensaje": "No autenticado.", "tipo": "error"}), 401
+    
     try:
         contenido = request.get_json(force=True)
         datos = contenido.get("datos", [])
         nuevo_nombre = contenido.get("nuevo_nombre", "").strip()
         
         if not nuevo_nombre:
-            return jsonify({"success": False, "mensaje": "⚠️ No se indicó nombre."})
+            return jsonify({
+                "success": False, 
+                "mensaje": "Nombre de archivo requerido",
+                "tipo": "warning"
+            })
         
         if not nuevo_nombre.lower().endswith(".xlsx"):
             nuevo_nombre += ".xlsx"
         
         user = session.get("usuario")
-        
-        if MODO_R2:
-            ruta_nueva = os.path.join(BASE_DIR, nuevo_nombre)
-        else:
-            user_dir = os.path.join(BASE_DIR, user)
-            os.makedirs(user_dir, exist_ok=True)
-            ruta_nueva = os.path.join(user_dir, nuevo_nombre)
-        
-        guardar_poligonos(datos, ruta_nueva)
-        exito = guardar_archivo(user, ruta_nueva)
+        exito = guardar_poligonos(datos, user, nuevo_nombre)
         
         if exito:
-            if MODO_R2:
-                try:
-                    os.remove(ruta_nueva)
-                except:
-                    pass
-            return jsonify({"success": True, "mensaje": f"✅ Archivo '{nuevo_nombre}' guardado correctamente."})
+            if ES_LOCAL:
+                return jsonify({
+                    "success": True, 
+                    "mensaje": "GRABACIÓN EXITOSA LOCALMENTE",
+                    "detalle": f"Archivo '{nuevo_nombre}' guardado",
+                    "tipo": "success"
+                })
+            else:
+                return jsonify({
+                    "success": True, 
+                    "mensaje": "GRABACIÓN EXITOSA EN R2",
+                    "detalle": f"Archivo '{nuevo_nombre}' sincronizado",
+                    "tipo": "success"
+                })
         else:
-            return jsonify({"success": False, "mensaje": "❌ Error al guardar archivo."})
-    
+            return jsonify({
+                "success": False, 
+                "mensaje": "Error al guardar archivo",
+                "tipo": "error"
+            })
     except Exception as e:
-        return jsonify({"success": False, "mensaje": f"❌ Error: {str(e)}"})
-
+        print(f"❌ Error en /guardar_como: {e}")
+        return jsonify({
+            "success": False, 
+            "mensaje": "Error al guardar",
+            "detalle": str(e),
+            "tipo": "error"
+        })
+    
+@app.route("/test_r2")
+def test_r2():
+    resultado = []
+    resultado.append(f"ES_LOCAL: {ES_LOCAL}")
+    resultado.append(f"MODO_R2: {MODO_R2}")
+    resultado.append(f"R2_BUCKET: {R2_BUCKET}")
+    resultado.append(f"R2_ENDPOINT: {R2_ENDPOINT[:50]}..." if R2_ENDPOINT else "None")
+    resultado.append(f"R2_ACCESS_KEY existe: {bool(R2_ACCESS_KEY)}")
+    resultado.append(f"R2_SECRET_KEY existe: {bool(R2_SECRET_KEY)}")
+    
+    if not MODO_R2:
+        resultado.append("<br><strong>❌ No está en modo R2</strong>")
+        return "<br>".join(resultado)
+    
+    try:
+        resultado.append("<br><strong>Intentando conectar a R2...</strong>")
+        resp = r2_client.list_objects_v2(Bucket=R2_BUCKET, MaxKeys=50)
+        archivos = [obj["Key"] for obj in resp.get("Contents", [])]
+        resultado.append(f"<br>✅ Conexión exitosa - Archivos encontrados: {len(archivos)}")
+        
+        if archivos:
+            resultado.append("<br><strong>Archivos en R2:</strong>")
+            for arch in archivos[:20]:
+                resultado.append(f"  • {arch}")
+            if len(archivos) > 20:
+                resultado.append(f"  ... y {len(archivos) - 20} más")
+        else:
+            resultado.append("<br>⚠️ No hay archivos en el bucket")
+            
+    except Exception as e:
+        resultado.append(f"<br><strong>❌ Error conectando a R2:</strong><br>{str(e)}")
+    
+    return "<br>".join(resultado)
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10000))
+    if not ES_LOCAL and not MODO_R2:
+        print("=" * 60)
+        print("⚠️  ADVERTENCIA: Configuración incompleta")
+        print("=" * 60)
+    
+    port = int(os.environ.get("PORT", 5000))
+    print(f"🚀 Iniciando servidor en puerto {port}")
     app.run(host="0.0.0.0", port=port, debug=False)

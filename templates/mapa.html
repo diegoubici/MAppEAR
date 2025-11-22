@@ -141,6 +141,88 @@ header span { float:right; line-height:30px; }
 #tablaPoligonos td input:focus { background:#eef; outline:none; }
 #tablaPoligonos input[type="color"] { width:30px; height:20px; padding:0; border:none; }
 
+/* === ANCHOS PERSONALIZADOS DE COLUMNAS === */
+/* 
+  🎯 GUÍA PARA MODIFICAR ANCHOS:
+  
+  Para cambiar el ancho de una columna, modifica los valores en pixeles (px)
+  
+  Columna 1 = Sel (checkbox)
+  Columna 2 = Nombre Productor
+  Columna 3 = Has
+  Columna 4 = Status
+  Columna 5 = Status1
+  Columna 6 = Status2
+  Columna 7 = Status3
+  Columna 8 = Ptdo (Partido)
+  Columna 9 = Color
+  
+  Ejemplo: Para hacer "Nombre" más ancho, cambia 200px a 300px
+*/
+
+/* Columna 1: Sel (Checkbox) */
+.col-sel { 
+  width: 40px; 
+  min-width: 40px; 
+  max-width: 40px; 
+}
+
+/* Columna 2: Nombre Productor */
+.col-nombre { 
+  width: 200px; 
+  min-width: 200px; 
+  max-width: 200px; 
+}
+
+/* Columna 3: Has (Hectáreas) */
+.col-has { 
+  width: 60px; 
+  min-width: 60px; 
+  max-width: 60px; 
+}
+
+/* Columna 4: Status */
+.col-status { 
+  width: 75px; 
+  min-width: 75px; 
+  max-width: 75px; 
+}
+
+/* Columna 5: Status1 */
+.col-status1 { 
+  width: 75px; 
+  min-width: 75px; 
+  max-width: 75px; 
+}
+
+/* Columna 6: Status2 */
+.col-status2 { 
+  width: 75px; 
+  min-width: 75px; 
+  max-width: 75px; 
+}
+
+/* Columna 7: Status3 */
+.col-status3 { 
+  width: 75px; 
+  min-width: 75px; 
+  max-width: 75px; 
+}
+
+/* Columna 8: Partido */
+.col-partido { 
+  width: 100px; 
+  min-width: 100px; 
+  max-width: 100px; 
+}
+
+/* Columna 9: Color */
+.col-color { 
+  width: 50px; 
+  min-width: 50px; 
+  max-width: 50px; 
+}
+
 button { 
   margin-top:2px; 
   background-color:#0056b3; 
@@ -258,19 +340,32 @@ tr.seleccionado { background-color:#FFFF99 !important; }
   }
 }
 
+/* Estilos para el filtro de color */
+#filtroColor {
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+#filtroColor option {
+  padding: 4px;
+  font-weight: bold;
+}
+
 </style>
 </head>
 <body>
 
 <header>
-<h2>Mapa de Polígonos - {{ usuario }}</h2>
+<h2>MAppEAR - {{ archivo_nombre }} - {{ usuario }}</h2>
 <span><a href="/logout" style="color:white;">Cerrar sesión</a></span>
 </header>
 
 <div id="map"></div>
 
 <div id="tabla-container">
-  <div id="tabla-header">Editar atributos</div>
+  <div id="tabla-header">FILTRAR ATRIBUTOS</div>
 
   <div id="tabla-body">
     <div id="botonera">
@@ -294,34 +389,46 @@ tr.seleccionado { background-color:#FFFF99 !important; }
     </div>
 
     <div id="filtros">
-      <input type="text" placeholder="Sel" data-col="0" style="width:40px;">
-      <input type="text" placeholder="Nombre" data-col="1" style="width:120px;">
-      <input type="text" placeholder="Has" data-col="2" style="width:49px;">
+      <span style="width:40px; display:inline-block;"></span>
+      <input type="text" placeholder="Nombre" data-col="1" style="width:150px;">
+      <input type="text" placeholder="Has" data-col="2" style="width:40px;">
       <input type="text" placeholder="Status" data-col="3" style="width:56px;">
       <input type="text" placeholder="Status1" data-col="4" style="width:56px;">
       <input type="text" placeholder="Status2" data-col="5" style="width:56px;">
       <input type="text" placeholder="Status3" data-col="6" style="width:56px;">
       <input type="text" placeholder="Partido" data-col="7" style="width:80px;">
-      <input type="text" placeholder="Color" data-col="8" style="width:60px;">
+      <select id="filtroColor" data-col="8" style="width:70px; font-size:10px; padding:2px;">
+        <option value="">Color</option>
+      </select>
     </div>
 
     <div id="edicion-masiva">
       <div class="titulo-edicion">✏️ EDICIÓN MASIVA DE COLUMNAS</div>
       <div class="fila-edicion">
-        <span style="width:40px; font-size:10px;">Sel</span>
-        <input type="text" id="edit-nombre" placeholder="Nombre" style="width:120px;">
+        <input type="text" id="edit-nombre" placeholder="Nombre" style="width:150px;">
         <input type="text" id="edit-has" placeholder="Has" style="width:40px;">
-        <input type="text" id="edit-status" placeholder="Status" style="width:56px;">
-        <input type="text" id="edit-status1" placeholder="Status1" style="width:56px;">
-        <input type="text" id="edit-status2" placeholder="Status2" style="width:80px;">
-        <input type="text" id="edit-status3" placeholder="Status3" style="width:56px;">
-        <input type="text" id="edit-partido" placeholder="Partido" style="width:80px;">
+        <input type="text" id="edit-status" placeholder="Status" style="width:65px;">
+        <input type="text" id="edit-status1" placeholder="Status1" style="width:60px;">
+        <input type="text" id="edit-status2" placeholder="Status2" style="width:60px;">
+        <input type="text" id="edit-status3" placeholder="Status3" style="width:60px;">
+        <input type="text" id="edit-partido" placeholder="Partido" style="width:90px;">
         <button id="editarColumnas">✏️ EDITAR COLUMNAS</button>
       </div>
     </div>
 
     <div id="tabla-scroll">
       <table id="tablaPoligonos">
+        <colgroup>
+          <col class="col-sel">
+          <col class="col-nombre">
+          <col class="col-has">
+          <col class="col-status">
+          <col class="col-status1">
+          <col class="col-status2">
+          <col class="col-status3">
+          <col class="col-partido">
+          <col class="col-color">
+        </colgroup>
         <thead>
           <tr>
             <th>Sel</th>
@@ -416,15 +523,210 @@ function mostrarToast(titulo, detalle, tipo = 'success') {
   }, 3000);
 }
 
-// ORDENAMIENTO SIMPLE
+// === FILTRO DINÁMICO POR COLOR ===
+function generarFiltroColores() {
+  const coloresUnicos = new Map();
+  
+  poligonos.forEach((p) => {
+    const color = (p.color || '#CCCCCC').toUpperCase();
+    if (!coloresUnicos.has(color)) {
+      const cantidad = poligonos.filter(pol => (pol.color || '#CCCCCC').toUpperCase() === color).length;
+      coloresUnicos.set(color, cantidad);
+    }
+  });
+  
+  const coloresOrdenados = Array.from(coloresUnicos.entries())
+    .sort((a, b) => b[1] - a[1]);
+  
+  const select = document.getElementById('filtroColor');
+  
+  coloresOrdenados.forEach(([color, cantidad]) => {
+    const option = document.createElement('option');
+    option.value = color;
+    
+    const cuadrado = '■';
+    const nombreColor = obtenerNombreColor(color);
+    option.textContent = `${cuadrado} ${nombreColor} (${cantidad})`;
+    
+    option.style.backgroundColor = color;
+    option.style.color = esColorClaro(color) ? '#000000' : '#FFFFFF';
+    option.style.fontWeight = 'bold';
+    
+    select.appendChild(option);
+  });
+  
+  console.log(`✅ Filtro de colores generado: ${coloresOrdenados.length} colores únicos`);
+}
+
+// === REGENERAR FILTRO DINÁMICO EN TIEMPO REAL ===
+function regenerarFiltroColores() {
+  const selectColor = document.getElementById('filtroColor');
+  const valorActual = selectColor.value;
+  
+  // Limpiar opciones excepto la primera
+  selectColor.innerHTML = '<option value="">Color</option>';
+  
+  // Recolectar colores actuales de la tabla (no del JSON original)
+  const coloresUnicos = new Map();
+  
+  document.querySelectorAll('#tablaPoligonos tbody tr').forEach(tr => {
+    const colorInput = tr.querySelector('input.colorInput');
+    if(colorInput) {
+      const color = colorInput.value.toUpperCase();
+      if(!coloresUnicos.has(color)) {
+        coloresUnicos.set(color, 0);
+      }
+      coloresUnicos.set(color, coloresUnicos.get(color) + 1);
+    }
+  });
+  
+  // Ordenar por cantidad
+  const coloresOrdenados = Array.from(coloresUnicos.entries())
+    .sort((a, b) => b[1] - a[1]);
+  
+  // Repoblar el select
+  coloresOrdenados.forEach(([color, cantidad]) => {
+    const option = document.createElement('option');
+    option.value = color;
+    
+    const cuadrado = '■';
+    const nombreColor = obtenerNombreColor(color);
+    option.textContent = `${cuadrado} ${nombreColor} (${cantidad})`;
+    
+    option.style.backgroundColor = color;
+    option.style.color = esColorClaro(color) ? '#000000' : '#FFFFFF';
+    option.style.fontWeight = 'bold';
+    
+    selectColor.appendChild(option);
+  });
+  
+  // Restaurar valor seleccionado si aún existe
+  if(valorActual && Array.from(selectColor.options).some(opt => opt.value === valorActual)) {
+    selectColor.value = valorActual;
+  }
+  
+  console.log(`🔄 Filtro actualizado: ${coloresOrdenados.length} colores detectados en la tabla`);
+}
+
+function obtenerNombreColor(hex) {
+  const coloresNombres = {
+    '#FF0000': 'ROJO',
+    '#00FF00': 'VERDE',
+    '#0000FF': 'AZUL',
+    '#FFFF00': 'AMARILLO',
+    '#FFA500': 'NARANJA',
+    '#800080': 'MORADO',
+    '#00FFFF': 'CYAN',
+    '#FF00FF': 'MAGENTA',
+    '#808080': 'GRIS',
+    '#000000': 'NEGRO',
+    '#FFFFFF': 'BLANCO',
+    '#B5EAD7': 'VERDE MENTA',
+    '#FFDAC1': 'DURAZNO',
+    '#CBAACB': 'LAVANDA',
+    '#E2F0CB': 'VERDE CLARO',
+    '#CCCCCC': 'GRIS CLARO'
+  };
+  
+  return coloresNombres[hex.toUpperCase()] || hex;
+}
+
+function esColorClaro(hex) {
+  const rgb = parseInt(hex.slice(1), 16);
+  const r = (rgb >> 16) & 0xff;
+  const g = (rgb >>  8) & 0xff;
+  const b = (rgb >>  0) & 0xff;
+  const luminancia = 0.299 * r + 0.587 * g + 0.114 * b;
+  return luminancia > 128;
+}
+
+generarFiltroColores();
+
+// === DETECTAR CAMBIOS MANUALES EN COLORES DE LA TABLA ===
+document.querySelector('#tablaPoligonos tbody').addEventListener('change', function(e) {
+  if(e.target.classList.contains('colorInput')) {
+    // Regenerar filtro cuando se cambia un color manualmente
+    setTimeout(() => regenerarFiltroColores(), 100);
+  }
+});
+
+// === SISTEMA DE FILTROS UNIFICADO ===
+document.getElementById('filtroColor').addEventListener('click', function() {
+  regenerarFiltroColores();
+});
+
+document.getElementById('filtroColor').addEventListener('change', function() {
+  aplicarFiltros();
+});
+
+document.querySelectorAll('#filtros input').forEach(input => {
+  input.addEventListener('keyup', aplicarFiltros);
+});
+
+function aplicarFiltros() {
+  const filtros = {};
+  
+  document.querySelectorAll('#filtros input').forEach(inp => {
+    const col = parseInt(inp.getAttribute('data-col'));
+    const val = inp.value.toUpperCase().trim();
+    if(val) filtros[col] = val;
+  });
+  
+  const filtroColor = document.getElementById('filtroColor').value;
+  if(filtroColor) filtros[8] = filtroColor;
+  
+  let visibles = 0;
+  document.querySelectorAll('#tablaPoligonos tbody tr').forEach(row => {
+    let mostrar = true;
+    
+    Object.keys(filtros).forEach(col => {
+      if(col == 8) return;
+      
+      const cellVal = row.querySelectorAll('input')[col].value.toUpperCase();
+      if(!cellVal.includes(filtros[col])) mostrar = false;
+    });
+    
+    if(filtroColor && mostrar) {
+      const colorInput = row.querySelector('input.colorInput');
+      if(colorInput.value.toUpperCase() !== filtroColor.toUpperCase()) {
+        mostrar = false;
+      }
+    }
+    
+    row.style.display = mostrar ? '' : 'none';
+    if(mostrar) visibles++;
+  });
+  
+  const totalFiltros = Object.keys(filtros).length;
+  if(totalFiltros > 0) {
+    const totalRegistros = document.querySelectorAll('#tablaPoligonos tbody tr').length;
+    mostrarToast('Filtro aplicado', `${visibles} de ${totalRegistros} registros visibles`, 'info');
+  }
+}
+
+// === ORDENAMIENTO OPTIMIZADO PARA TABLAS GRANDES ===
 let lastSortCol = null;
 let sortAsc = true;
+let ordenandoEnProgreso = false;
 
 document.querySelectorAll('th.sortable').forEach(th => {
     th.addEventListener('click', function() {
         if(seleccionados.size === 0) {
             mostrarToast('Atención', 'Debe seleccionar al menos un registro para ordenar', 'warning');
             return;
+        }
+        
+        if(ordenandoEnProgreso) {
+            mostrarToast('Procesando', 'Ya hay un ordenamiento en progreso', 'warning');
+            return;
+        }
+        
+        if(seleccionados.size > 1000) {
+            mostrarToast(
+                '⚠️ Selección grande', 
+                `Has seleccionado ${seleccionados.size} registros. Esto puede tardar unos segundos...`,
+                'warning'
+            );
         }
         
         const colIdx = parseInt(this.getAttribute('data-col'));
@@ -439,57 +741,94 @@ document.querySelectorAll('th.sortable').forEach(th => {
         document.querySelectorAll('th.sortable').forEach(h => h.classList.remove('asc', 'desc'));
         this.classList.add(sortAsc ? 'asc' : 'desc');
         
-        sortSelected(colIdx, sortAsc);
+        sortSelectedOptimized(colIdx, sortAsc);
     });
 });
 
-function sortSelected(colIdx, ascending) {
+function sortSelectedOptimized(colIdx, ascending) {
+    ordenandoEnProgreso = true;
     const tbody = document.querySelector('#tablaPoligonos tbody');
-    const selected = [];
     
-    seleccionados.forEach(idx => {
-        const row = tbody.querySelector(`tr[data-index="${idx}"]`);
-        if(row) {
-            const val = row.querySelectorAll('input')[colIdx].value;
-            selected.push({
-                row: row,
-                val: colIdx === 2 ? parseFloat(val) || 0 : val.toUpperCase()
+    mostrarToast('Ordenando...', `Procesando ${seleccionados.size} registros`, 'info');
+    tbody.style.pointerEvents = 'none';
+    
+    setTimeout(() => {
+        try {
+            const startTime = performance.now();
+            
+            const selected = [];
+            seleccionados.forEach(idx => {
+                const row = tbody.querySelector(`tr[data-index="${idx}"]`);
+                if(row) {
+                    const val = row.querySelectorAll('input')[colIdx].value;
+                    selected.push({
+                        row: row,
+                        val: colIdx === 2 ? parseFloat(val) || 0 : val.toUpperCase(),
+                        idx: idx
+                    });
+                }
             });
+            
+            selected.sort((a, b) => {
+                if(typeof a.val === 'number') {
+                    return ascending ? a.val - b.val : b.val - a.val;
+                }
+                return ascending ? a.val.localeCompare(b.val) : b.val.localeCompare(a.val);
+            });
+            
+            const allRows = Array.from(tbody.children);
+            const firstPos = allRows.indexOf(selected[0].row);
+            const fragment = document.createDocumentFragment();
+            
+            selected.forEach(item => item.row.remove());
+            selected.forEach(item => fragment.appendChild(item.row));
+            
+            const remainingRows = Array.from(tbody.children);
+            
+            if(firstPos === 0 || remainingRows.length === 0) {
+                tbody.insertBefore(fragment, tbody.firstChild);
+            } else if(firstPos >= remainingRows.length) {
+                tbody.appendChild(fragment);
+            } else {
+                const referenceNode = remainingRows[Math.min(firstPos, remainingRows.length - 1)];
+                tbody.insertBefore(fragment, referenceNode);
+            }
+            
+            requestAnimationFrame(() => {
+                seleccionados.forEach(idx => {
+                    const row = tbody.querySelector(`tr[data-index="${idx}"]`);
+                    if(row) {
+                        row.classList.add('seleccionado');
+                        row.querySelector('.selectFila').checked = true;
+                        if(leafletPoligonos[idx]) leafletPoligonos[idx].setStyle({weight:2});
+                    }
+                });
+                
+                tbody.style.pointerEvents = '';
+                ordenandoEnProgreso = false;
+                
+                const endTime = performance.now();
+                const tiempo = ((endTime - startTime) / 1000).toFixed(2);
+                
+                mostrarToast(
+                    '✅ Ordenamiento completado',
+                    `${selected.length} registros en ${tiempo}s ${ascending ? '▲' : '▼'}`,
+                    'success'
+                );
+            });
+            
+        } catch(error) {
+            console.error('Error al ordenar:', error);
+            tbody.style.pointerEvents = '';
+            ordenandoEnProgreso = false;
+            
+            mostrarToast(
+                'Error',
+                'No se pudo completar el ordenamiento. Intenta con menos registros.',
+                'error'
+            );
         }
-    });
-    
-    selected.sort((a, b) => {
-        if(typeof a.val === 'number') {
-            return ascending ? a.val - b.val : b.val - a.val;
-        }
-        return ascending ? a.val.localeCompare(b.val) : b.val.localeCompare(a.val);
-    });
-    
-    const firstRow = selected[0].row;
-    const allRows = Array.from(tbody.children);
-    const insertPos = allRows.indexOf(firstRow);
-    
-    selected.forEach(item => item.row.remove());
-    
-    if(insertPos === 0) {
-        selected.reverse().forEach(item => tbody.insertBefore(item.row, tbody.firstChild));
-    } else {
-        const ref = tbody.children[insertPos - 1];
-        selected.forEach(item => ref.after(item.row));
-    }
-    
-    seleccionados.forEach(idx => {
-        const row = tbody.querySelector(`tr[data-index="${idx}"]`);
-        row.classList.add('seleccionado');
-        row.querySelector('.selectFila').checked = true;
-        if(leafletPoligonos[idx]) leafletPoligonos[idx].setStyle({weight:2});
-    });
-    
-    mostrarToast(
-        'Ordenamiento completado',
-        `${selected.length} registros ordenados ${ascending ? 'ascendente ▲' : 'descendente ▼'}`,
-        'info'
-    );
+    }, 50);
 }
 
 function getFilaIndex(row) {
@@ -551,19 +890,29 @@ document.getElementById('aplicarColor').addEventListener('click', ()=>{
   });
   
   mostrarToast('Color aplicado', `Color aplicado a ${count} registros`, 'success');
+  
+  // Regenerar filtro automáticamente
+  regenerarFiltroColores();
 });
 
 document.getElementById('seleccionarFiltrados').addEventListener('click', ()=>{
+  const filasVisibles = document.querySelectorAll('#tablaPoligonos tbody tr:not([style*="display: none"])');
+  
+  if(filasVisibles.length > 2000) {
+    if(!confirm(`⚠️ Vas a seleccionar ${filasVisibles.length} registros.\n\nEsto puede hacer que el ordenamiento sea lento.\n\n¿Continuar?`)) {
+      return;
+    }
+  }
+  
   let count = 0;
-  document.querySelectorAll('#tablaPoligonos tbody tr').forEach(tr => {
-    if(tr.style.display !== 'none') {
-      const idx = getFilaIndex(tr);
-      if(!seleccionados.has(idx)) {
-        toggleSeleccion(idx);
-        count++;
-      }
+  filasVisibles.forEach(tr => {
+    const idx = getFilaIndex(tr);
+    if(!seleccionados.has(idx)) {
+      toggleSeleccion(idx);
+      count++;
     }
   });
+  
   mostrarToast('Selección completada', `${count} registros seleccionados`, 'info');
 });
 
@@ -609,26 +958,6 @@ document.getElementById('editarColumnas').addEventListener('click', function(){
   } else {
     mostrarToast('Sin cambios', 'No se ingresaron valores para editar', 'info');
   }
-});
-
-document.querySelectorAll('#filtros input').forEach(input => {
-  input.addEventListener('keyup', function() {
-    const filtros = {};
-    document.querySelectorAll('#filtros input').forEach(inp => {
-      const col = parseInt(inp.getAttribute('data-col'));
-      const val = inp.value.toUpperCase().trim();
-      if(val) filtros[col] = val;
-    });
-
-    document.querySelectorAll('#tablaPoligonos tbody tr').forEach(row => {
-      let show = true;
-      Object.keys(filtros).forEach(col => {
-        const cellVal = row.querySelectorAll('input')[col].value.toUpperCase();
-        if(!cellVal.includes(filtros[col])) show = false;
-      });
-      row.style.display = show ? '' : 'none';
-    });
-  });
 });
 
 const tabla = document.getElementById("tabla-container");
@@ -768,6 +1097,7 @@ document.getElementById('exportarPDF').addEventListener('click',()=>{
 
 document.getElementById("btnLimpiar").addEventListener("click", function() {
     document.querySelectorAll("#filtros input").forEach(input => input.value = "");
+    document.getElementById("filtroColor").value = "";
     document.querySelectorAll("#edicion-masiva input").forEach(input => input.value = "");
     document.querySelectorAll("#tablaPoligonos tbody tr").forEach(tr => tr.style.display = '');
     document.getElementById("colorBloque").value = "";
@@ -778,27 +1108,3 @@ document.getElementById("btnLimpiar").addEventListener("click", function() {
 </script>
 </body>
 </html>
-```
-
----
-
-## 🎉 **Listo para usar!**
-
-Ahora cuando guardes verás:
-
-### **En LOCAL:**
-```
-┌─────────────────────────────────────┐
-│ ✓ GRABACIÓN EXITOSA LOCALMENTE     │
-├─────────────────────────────────────┤
-│ Archivo guardado en su computadora  │
-└─────────────────────────────────────┘
-```
-
-### **En RENDER (R2):**
-```
-┌─────────────────────────────────────┐
-│ ✓ GRABACIÓN EXITOSA EN R2           │
-├─────────────────────────────────────┤
-│ Archivo sincronizado en la nube     │
-└─────────────────────────────────────┘

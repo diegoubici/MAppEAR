@@ -365,10 +365,14 @@ def abrir_archivo(nombre):
     poligonos = cargar_poligonos_desde_bytesio(bio)
     session["archivo_seleccionado"] = nombre
     
+    # Extraer nombre sin extensión para mostrar en el header
+    nombre_sin_extension = os.path.splitext(nombre)[0]
+    
     return render_template("mapa.html", 
                          usuario=user, 
                          rol=session.get("rol","user"), 
-                         poligonos=poligonos)
+                         poligonos=poligonos,
+                         archivo_nombre=nombre_sin_extension)
 
 @app.route("/guardar", methods=["POST"])
 def guardar():
