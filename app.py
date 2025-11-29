@@ -4,6 +4,8 @@ import pandas as pd
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session
 import boto3
 from botocore.exceptions import ClientError
+from shapely.geometry import Polygon, MultiPolygon
+from shapely.ops import unary_union
 
 # Cargar variables de entorno desde archivo .env (solo en local)
 try:
@@ -469,6 +471,220 @@ def guardar_como():
         return jsonify({
             "success": False, 
             "mensaje": "Error al guardar",
+            "detalle": str(e),
+            "tipo": "error"
+        })
+
+@app.route("/combinar_poligonos", methods=["POST"])
+def combinar_poligonos():
+    """Combina polígonos seleccionados en uno solo (solo para DSUBICI)"""
+    if "usuario" not in session:
+        return jsonify({"success": False, "mensaje": "No autenticado.", "tipo": "error"}), 401
+    
+    if session["usuario"] != "DSUBICI":
+        return jsonify({"success": False, "mensaje": "Permiso denegado.", "tipo": "error"}), 403
+    
+    archivo_sel = session.get("archivo_seleccionado")
+    if not archivo_sel:
+        return jsonify({"success": False, "mensaje": "No hay archivo seleccionado.", "tipo": "error"})
+    
+    try:
+        data = request.get_json(force=True)
+        indices = data.get("indices", [])
+        nombre_nuevo = data.get("nombre", "").strip()
+        color_nuevo = data.get("color", "#CCCCCC").strip()
+        todos_datos = data.get("datos", [])
+        
+        print(f"📥 Recibidos {len(indices)} índices para combinar: {indices}")
+        print(f"📊 Total de datos: {len(todos_datos)}")
+        
+        if len(indices) < 2:
+            return jsonify({
+                "success": False,
+                "mensaje": "Debe seleccionar al menos 2 polígonos",
+                "tipo": "warning"
+            })
+        
+        if not nombre_nuevo:
+            return jsonify({
+                "success": False,
+                "mensaje": "Debe ingresar un nombre para el polígono combinado",
+                "tipo": "warning"
+            })
+        
+        # Extraer los polígonos seleccionados
+        poligonos_a_combinar = []
+        indices_con_coordenadas = []  # NUEVO: Guardar qué índices tienen coordenadas válidas
+        superficie_total = 0.0
+        
+        for idx in indices:
+            if idx < len(todos_datos):
+                pol_data = todos_datos[idx]
+                coords_str = pol_data.get("COORDENADAS", "")
+                
+                print(f"  Polígono {idx}: {pol_data.get('name', 'Sin nombre')}, coords: {len(coords_str)} chars")
+                
+                if coords_str and coords_str.strip():
+                    # Parsear coordenadas
+                    coords = []
+                    puntos = coords_str.strip().split()
+                    for p in puntos:
+                        if "," in p:
+                            try:
+                                lon, lat = map(float, p.split(","))
+                                coords.append((lon, lat))
+                            except Exception as e:
+                                print(f"    ⚠️ Error parseando punto {p}: {e}")
+                    
+                    if len(coords) >= 3:
+                        poligonos_a_combinar.append(Polygon(coords))
+                        indices_con_coordenadas.append(idx)  # NUEVO: Marcar este índice como válido
+                        print(f"    ✅ Polígono válido con {len(coords)} puntos")
+                        
+                        # Sumar superficie
+                        try:
+                            sup_str = pol_data.get("superficie", "0")
+                            sup = float(sup_str) if sup_str else 0.0
+                            superficie_total += sup
+                            print(f"    📐 Superficie: {sup} has")
+                        except Exception as e:
+                            print(f"    ⚠️ Error parseando superficie: {e}")
+                else:
+                    print(f"    ⚠️ Sin coordenadas válidas - será preservado sin combinar")
+        
+        print(f"📊 Resumen: {len(indices)} seleccionados, {len(indices_con_coordenadas)} con coordenadas válidas")
+        
+        if len(poligonos_a_combinar) < 2:
+            return jsonify({
+                "success": False,
+                "mensaje": "Los polígonos seleccionados no tienen coordenadas válidas",
+                "tipo": "error"
+            })
+        
+        # Unir polígonos usando shapely
+        print(f"🔄 Combinando {len(poligonos_a_combinar)} polígonos...")
+        merged = unary_union(poligonos_a_combinar)
+        
+        # Convertir el resultado a coordenadas
+        nuevos_poligonos = []  # Lista para almacenar TODOS los polígonos resultantes
+        
+        if isinstance(merged, Polygon):
+            # Es un polígono simple - todos se tocan
+            print(f"✅ Resultado: Polígono simple (todos los polígonos se tocan)")
+            coords_combinadas = []
+            for lon, lat in merged.exterior.coords:
+                coords_combinadas.append(f"{lon},{lat}")
+            
+            coords_str = " ".join(coords_combinadas)
+            
+            nuevo_poligono = {
+                "name": nombre_nuevo,
+                "superficie": str(round(superficie_total, 2)),
+                "status": "",
+                "status1": "",
+                "status2": "",
+                "status3": "",
+                "partido": "",
+                "color": color_nuevo,
+                "colorOriginal": color_nuevo,
+                "COORDENADAS": coords_str
+            }
+            nuevos_poligonos.append(nuevo_poligono)
+            print(f"✅ Creado 1 polígono combinado con {len(coords_combinadas)} puntos")
+                
+        elif isinstance(merged, MultiPolygon):
+            # Son múltiples polígonos - NO todos se tocan
+            print(f"⚠️ ATENCIÓN: Los polígonos seleccionados NO se tocan todos entre sí")
+            print(f"   Se detectaron {len(merged.geoms)} grupos separados")
+            
+            # CREAR UN POLÍGONO POR CADA GRUPO QUE SE TOCA
+            for i, geom in enumerate(merged.geoms):
+                coords_combinadas = []
+                for lon, lat in geom.exterior.coords:
+                    coords_combinadas.append(f"{lon},{lat}")
+                
+                coords_str = " ".join(coords_combinadas)
+                
+                # Nombre diferente para cada grupo
+                if len(merged.geoms) > 1:
+                    nombre_parte = f"{nombre_nuevo} - PARTE {i+1}"
+                else:
+                    nombre_parte = nombre_nuevo
+                
+                # Calcular superficie proporcional (aproximada)
+                area_relativa = geom.area / merged.area
+                superficie_parte = superficie_total * area_relativa
+                
+                nuevo_pol = {
+                    "name": nombre_parte,
+                    "superficie": str(round(superficie_parte, 2)),
+                    "status": "",
+                    "status1": "",
+                    "status2": "",
+                    "status3": "",
+                    "partido": "",
+                    "color": color_nuevo,
+                    "colorOriginal": color_nuevo,
+                    "COORDENADAS": coords_str
+                }
+                nuevos_poligonos.append(nuevo_pol)
+                print(f"   ✅ Creado: {nombre_parte} ({len(coords_combinadas)} puntos, {superficie_parte:.2f} has)")
+            
+            print(f"⚠️ Se crearon {len(merged.geoms)} polígonos separados en lugar de 1")
+        
+        print(f"✅ Total de polígonos resultantes: {len(nuevos_poligonos)}")
+        
+        # CAMBIO CRÍTICO: Crear nueva lista eliminando SOLO los que se combinaron
+        indices_a_eliminar = set(indices_con_coordenadas)  # Solo eliminar los que tienen coordenadas válidas
+        nuevos_datos = []
+        
+        # Preservar todos los polígonos que NO fueron procesados
+        for i, pol in enumerate(todos_datos):
+            if i not in indices_a_eliminar:
+                nuevos_datos.append(pol)
+                if i in indices:
+                    print(f"   ⚠️ Preservando polígono {i} (sin coordenadas válidas): {pol.get('name', 'Sin nombre')}")
+        
+        # Agregar TODOS los nuevos polígonos al final
+        nuevos_datos.extend(nuevos_poligonos)
+        
+        print(f"✅ Polígonos procesados y eliminados: {len(indices_con_coordenadas)}")
+        print(f"✅ Polígonos preservados (sin procesar): {len(indices) - len(indices_con_coordenadas)}")
+        print(f"✅ Polígonos nuevos creados: {len(nuevos_poligonos)}")
+        print(f"📊 Superficie total combinada: {superficie_total} has")
+        print(f"📄 Total final de polígonos: {len(nuevos_datos)}")
+        
+        # GUARDAR AUTOMÁTICAMENTE EL ARCHIVO
+        user = session.get("usuario")
+        exito = guardar_poligonos(nuevos_datos, user, archivo_sel)
+        
+        if not exito:
+            return jsonify({
+                "success": False,
+                "mensaje": "Error al guardar los cambios",
+                "tipo": "error"
+            })
+        
+        # Mensaje personalizado según el resultado
+        if len(nuevos_poligonos) == 1:
+            detalle_msg = f"{len(indices)} polígonos combinados en '{nombre_nuevo}'. Recargando..."
+        else:
+            detalle_msg = f"Se crearon {len(nuevos_poligonos)} polígonos separados porque NO todos se tocan. Recargando..."
+        
+        return jsonify({
+            "success": True,
+            "mensaje": "Polígonos procesados exitosamente",
+            "detalle": detalle_msg,
+            "tipo": "success" if len(nuevos_poligonos) == 1 else "warning"
+        })
+        
+    except Exception as e:
+        print(f"❌ Error combinando polígonos: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            "success": False,
+            "mensaje": "Error al combinar polígonos",
             "detalle": str(e),
             "tipo": "error"
         })
