@@ -66,6 +66,68 @@ header span { float:right; line-height:30px; }
   text-transform: uppercase;
 }
 
+/* === SECCIÓN COMBINAR POLÍGONOS === */
+#combinar-poligonos {
+  background: #fff3cd;
+  border: 2px solid #ff6b00;
+  margin: 2px;
+  padding: 8px;
+  border-radius: 4px;
+  display: none; /* Oculto por defecto, se muestra solo para DSUBICI */
+}
+
+#combinar-poligonos .titulo-combinar {
+  font-weight: bold;
+  color: #ff6b00;
+  margin-bottom: 8px;
+  text-align: center;
+  font-size: 13px;
+}
+
+#combinar-poligonos .fila-combinar {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 5px;
+}
+
+#combinar-poligonos input[type="text"] {
+  flex: 1;
+  border: 1px solid #ccc;
+  background: white;
+  padding: 4px 8px;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+#combinar-poligonos input[type="color"] {
+  width: 50px;
+  height: 28px;
+  border: 1px solid #ccc;
+  cursor: pointer;
+}
+
+#btnCombinarPoligonos {
+  background-color: #ff6b00;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: bold;
+  width: 100%;
+}
+
+#btnCombinarPoligonos:hover {
+  background-color: #e55b00;
+}
+
+#btnCombinarPoligonos:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+}
+
 #tabla-scroll {
   flex:1;
   overflow-y:auto;
@@ -142,81 +204,54 @@ header span { float:right; line-height:30px; }
 #tablaPoligonos input[type="color"] { width:30px; height:20px; padding:0; border:none; }
 
 /* === ANCHOS PERSONALIZADOS DE COLUMNAS === */
-/* 
-  🎯 GUÍA PARA MODIFICAR ANCHOS:
-  
-  Para cambiar el ancho de una columna, modifica los valores en pixeles (px)
-  
-  Columna 1 = Sel (checkbox)
-  Columna 2 = Nombre Productor
-  Columna 3 = Has
-  Columna 4 = Status
-  Columna 5 = Status1
-  Columna 6 = Status2
-  Columna 7 = Status3
-  Columna 8 = Ptdo (Partido)
-  Columna 9 = Color
-  
-  Ejemplo: Para hacer "Nombre" más ancho, cambia 200px a 300px
-*/
-
-/* Columna 1: Sel (Checkbox) */
 .col-sel { 
   width: 40px; 
   min-width: 40px; 
   max-width: 40px; 
 }
 
-/* Columna 2: Nombre Productor */
 .col-nombre { 
   width: 200px; 
   min-width: 200px; 
   max-width: 200px; 
 }
 
-/* Columna 3: Has (Hectáreas) */
 .col-has { 
   width: 60px; 
   min-width: 60px; 
   max-width: 60px; 
 }
 
-/* Columna 4: Status */
 .col-status { 
   width: 75px; 
   min-width: 75px; 
   max-width: 75px; 
 }
 
-/* Columna 5: Status1 */
 .col-status1 { 
   width: 75px; 
   min-width: 75px; 
   max-width: 75px; 
 }
 
-/* Columna 6: Status2 */
 .col-status2 { 
   width: 75px; 
   min-width: 75px; 
   max-width: 75px; 
 }
 
-/* Columna 7: Status3 */
 .col-status3 { 
   width: 75px; 
   min-width: 75px; 
   max-width: 75px; 
 }
 
-/* Columna 8: Partido */
 .col-partido { 
   width: 100px; 
   min-width: 100px; 
   max-width: 100px; 
 }
 
-/* Columna 9: Color */
 .col-color { 
   width: 50px; 
   min-width: 50px; 
@@ -340,7 +375,6 @@ tr.seleccionado { background-color:#FFFF99 !important; }
   }
 }
 
-/* Estilos para el filtro de color */
 #filtroColor {
   border: 1px solid #ccc;
   border-radius: 3px;
@@ -401,6 +435,23 @@ tr.seleccionado { background-color:#FFFF99 !important; }
         <option value="">Color</option>
       </select>
     </div>
+
+    <!-- SECCIÓN COMBINAR POLÍGONOS (solo para DSUBICI) -->
+    {% if usuario == "DSUBICI" %}
+    <div id="combinar-poligonos">
+      <div class="titulo-combinar">🔗 COMBINAR POLÍGONOS SELECCIONADOS</div>
+      <div style="background: #e7f3ff; border: 1px solid #2196F3; padding: 6px 8px; border-radius: 3px; margin-bottom: 5px; font-size: 10px; line-height: 1.4;">
+        ℹ️ <strong>IMPORTANTE:</strong><br>
+        • Si los polígonos <strong>se tocan</strong> → Se combinan en UNO solo ✅<br>
+        • Si NO se tocan → Se crean <strong>VARIOS polígonos separados</strong> (uno por cada grupo)
+      </div>
+      <div class="fila-combinar">
+        <input type="text" id="nombreCombinado" placeholder="Nombre del polígono combinado">
+        <input type="color" id="colorCombinado" value="#FF6B00" title="Color del polígono combinado">
+      </div>
+      <button id="btnCombinarPoligonos">🔗 COMBINAR Y ELIMINAR ORIGINALES</button>
+    </div>
+    {% endif %}
 
     <div id="edicion-masiva">
       <div class="titulo-edicion">✏️ EDICIÓN MASIVA DE COLUMNAS</div>
@@ -475,11 +526,13 @@ tr.seleccionado { background-color:#FFFF99 !important; }
 <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
 
 <script>
 const poligonos = {{ poligonos|tojson }};
 const leafletPoligonos = [];
 const seleccionados = new Set();
+const esUsuarioDSUBICI = "{{ usuario }}" === "DSUBICI";
 
 const map = L.map('map').setView([-35, -63], 8);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{ attribution:'&copy; OpenStreetMap' }).addTo(map);
@@ -490,10 +543,48 @@ poligonos.forEach((p, idx)=>{
       .addTo(map)
       .bindPopup("<b>"+p.name+"</b><br>"+p.superficie+" has");
     poly.index = idx;
-    poly.on('click',()=>{ toggleSeleccion(idx); scrollFila(idx); });
+    poly.on('click',()=>{ 
+      toggleSeleccion(idx); 
+      scrollFila(idx);
+      
+      // NUEVO: Resaltar campo nombre SOLO para DSUBICI
+      if(esUsuarioDSUBICI) {
+        setTimeout(() => {
+          const fila = document.querySelector(`#tablaPoligonos tbody tr[data-index="${idx}"]`);
+          if(fila) {
+            const inputNombre = fila.querySelectorAll('input')[1];
+            if(inputNombre) {
+              inputNombre.focus();
+              if(inputNombre.value && inputNombre.value.trim() !== '') {
+                inputNombre.select();
+              } else {
+                inputNombre.setSelectionRange(0, 0);
+              }
+              
+              const estiloOriginalBg = inputNombre.style.backgroundColor;
+              const estiloOriginalBorder = inputNombre.style.border;
+              
+              inputNombre.style.backgroundColor = '#fff3cd';
+              inputNombre.style.border = '2px solid #ffc107';
+              inputNombre.style.transition = 'all 0.2s ease';
+              
+              setTimeout(() => {
+                inputNombre.style.backgroundColor = estiloOriginalBg;
+                inputNombre.style.border = estiloOriginalBorder;
+              }, 500);
+            }
+          }
+        }, 100);
+      }
+    });
     leafletPoligonos.push(poly);
   } else leafletPoligonos.push(null);
 });
+
+// Mostrar sección de combinar solo para DSUBICI
+if(esUsuarioDSUBICI) {
+  document.getElementById('combinar-poligonos').style.display = 'block';
+}
 
 // === FUNCIÓN TOAST ===
 function mostrarToast(titulo, detalle, tipo = 'success') {
@@ -521,6 +612,247 @@ function mostrarToast(titulo, detalle, tipo = 'success') {
     toast.classList.add('hiding');
     setTimeout(() => toast.remove(), 300);
   }, 3000);
+}
+
+// === COMBINAR POLÍGONOS CON UNIÓN GEOMÉTRICA (solo DSUBICI) ===
+if(esUsuarioDSUBICI) {
+  document.getElementById('btnCombinarPoligonos').addEventListener('click', function() {
+    if(seleccionados.size < 2) {
+      mostrarToast('Atención', 'Debe seleccionar al menos 2 polígonos para combinar', 'warning');
+      return;
+    }
+    
+    const nombreNuevo = document.getElementById('nombreCombinado').value.trim();
+    if(!nombreNuevo) {
+      mostrarToast('Atención', 'Debe ingresar un nombre para el polígono combinado', 'warning');
+      return;
+    }
+    
+    const colorNuevo = document.getElementById('colorCombinado').value;
+    
+    // Mostrar información de los polígonos seleccionados
+    const nombresSeleccionados = [];
+    let superficieTotal = 0;
+    
+    seleccionados.forEach(idx => {
+      const fila = document.querySelector(`#tablaPoligonos tbody tr[data-index="${idx}"]`);
+      if(fila) {
+        const nombre = fila.querySelectorAll('input')[1].value;
+        const has = parseFloat(fila.querySelectorAll('input')[2].value) || 0;
+        nombresSeleccionados.push(nombre);
+        superficieTotal += has;
+      }
+    });
+    
+    const confirmMsg = `¿Confirma combinar estos ${seleccionados.size} polígonos?\n\n${nombresSeleccionados.join('\n')}\n\n➡️ En: "${nombreNuevo}"\n📏 Superficie total: ${superficieTotal.toFixed(2)} has\n\n⚠️ Los polígonos originales serán eliminados de la vista.`;
+    
+    if(!confirm(confirmMsg)) {
+      return;
+    }
+    
+    try {
+      const boton = document.getElementById('btnCombinarPoligonos');
+      boton.disabled = true;
+      boton.textContent = '⏳ COMBINANDO...';
+      
+      // Guardar el zoom y centro actual del mapa
+      const zoomActual = map.getZoom();
+      const centroActual = map.getCenter();
+      
+      // Recolectar todos los polígonos seleccionados y convertir a formato GeoJSON
+      const poligonosTurf = [];
+      const indicesAEliminar = Array.from(seleccionados).sort((a, b) => b - a);
+      
+      seleccionados.forEach(idx => {
+        if(leafletPoligonos[idx]) {
+          const coords = leafletPoligonos[idx].getLatLngs()[0];
+          
+          // Convertir coordenadas Leaflet [lat, lng] a GeoJSON [lng, lat]
+          const coordsGeoJSON = coords.map(latlng => [latlng.lng, latlng.lat]);
+          
+          // Cerrar el polígono si no está cerrado
+          if(coordsGeoJSON[0][0] !== coordsGeoJSON[coordsGeoJSON.length-1][0] || 
+             coordsGeoJSON[0][1] !== coordsGeoJSON[coordsGeoJSON.length-1][1]) {
+            coordsGeoJSON.push(coordsGeoJSON[0]);
+          }
+          
+          // Crear polígono Turf
+          const polygon = turf.polygon([coordsGeoJSON]);
+          poligonosTurf.push(polygon);
+        }
+      });
+      
+      // Combinar todos los polígonos usando unión geométrica
+      let poligonoCombinado = poligonosTurf[0];
+      
+      for(let i = 1; i < poligonosTurf.length; i++) {
+        try {
+          // Intentar unión geométrica
+          poligonoCombinado = turf.union(poligonoCombinado, poligonosTurf[i]);
+        } catch(e) {
+          console.warn('No se pudieron unir algunos polígonos, usando convex hull');
+          // Si falla la unión, usar convex hull de todos los puntos
+          const allPoints = [];
+          poligonosTurf.forEach(poly => {
+            const coords = turf.getCoords(poly)[0];
+            coords.forEach(coord => allPoints.push(coord));
+          });
+          const points = turf.points(allPoints);
+          poligonoCombinado = turf.convex(points);
+          break;
+        }
+      }
+      
+      // Si el resultado es null o inválido, usar convex hull
+      if(!poligonoCombinado) {
+        const allPoints = [];
+        poligonosTurf.forEach(poly => {
+          const coords = turf.getCoords(poly)[0];
+          coords.forEach(coord => allPoints.push(coord));
+        });
+        const points = turf.points(allPoints);
+        poligonoCombinado = turf.convex(points);
+      }
+      
+      // Extraer coordenadas del polígono combinado
+      let coordsFinales = turf.getCoords(poligonoCombinado);
+      
+      // Si es MultiPolygon, tomar todas las geometrías
+      if(poligonoCombinado.geometry.type === 'MultiPolygon') {
+        // Convertir MultiPolygon a array de polígonos
+        coordsFinales = coordsFinales;
+      } else {
+        // Es un solo Polygon
+        coordsFinales = [coordsFinales[0]];
+      }
+      
+      // Convertir de vuelta a formato Leaflet [lat, lng]
+      const coordsLeaflet = coordsFinales.map(polyCoords => {
+        return polyCoords.map(coord => [coord[1], coord[0]]); // [lng, lat] -> [lat, lng]
+      });
+      
+      // Crear el nuevo polígono combinado en el mapa
+      const nuevoPoly = L.polygon(coordsLeaflet, {
+        color: "#000000",
+        weight: 0.5,
+        fillColor: colorNuevo,
+        fillOpacity: 0.6
+      }).addTo(map);
+      
+      // Asignar índice al nuevo polígono
+      const nuevoIdx = leafletPoligonos.length;
+      nuevoPoly.index = nuevoIdx;
+      nuevoPoly.bindPopup("<b>" + nombreNuevo + "</b><br>" + superficieTotal.toFixed(2) + " has");
+      nuevoPoly.on('click', () => { 
+        toggleSeleccion(nuevoIdx); 
+        scrollFila(nuevoIdx);
+        
+        // Resaltar campo nombre SOLO para DSUBICI
+        if(esUsuarioDSUBICI) {
+          setTimeout(() => {
+            const fila = document.querySelector(`#tablaPoligonos tbody tr[data-index="${nuevoIdx}"]`);
+            if(fila) {
+              const inputNombre = fila.querySelectorAll('input')[1];
+              if(inputNombre) {
+                inputNombre.focus();
+                if(inputNombre.value && inputNombre.value.trim() !== '') {
+                  inputNombre.select();
+                } else {
+                  inputNombre.setSelectionRange(0, 0);
+                }
+                
+                const estiloOriginalBg = inputNombre.style.backgroundColor;
+                const estiloOriginalBorder = inputNombre.style.border;
+                
+                inputNombre.style.backgroundColor = '#fff3cd';
+                inputNombre.style.border = '2px solid #ffc107';
+                inputNombre.style.transition = 'all 0.2s ease';
+                
+                setTimeout(() => {
+                  inputNombre.style.backgroundColor = estiloOriginalBg;
+                  inputNombre.style.border = estiloOriginalBorder;
+                }, 500);
+              }
+            }
+          }, 100);
+        }
+      });
+      
+      // Agregar a la lista de polígonos de Leaflet
+      leafletPoligonos.push(nuevoPoly);
+      
+      // Eliminar los polígonos originales del mapa
+      indicesAEliminar.forEach(idx => {
+        if(leafletPoligonos[idx]) {
+          map.removeLayer(leafletPoligonos[idx]);
+          leafletPoligonos[idx] = null;
+        }
+      });
+      
+      // Agregar fila en la tabla para el nuevo polígono combinado
+      const tbody = document.querySelector('#tablaPoligonos tbody');
+      const nuevaFila = document.createElement('tr');
+      nuevaFila.setAttribute('data-index', nuevoIdx);
+      
+      // Obtener datos del primer polígono seleccionado para status, partido, etc.
+      const primeraFilaSeleccionada = document.querySelector(`#tablaPoligonos tbody tr[data-index="${Array.from(seleccionados)[0]}"]`);
+      const inputsPrimera = primeraFilaSeleccionada.querySelectorAll('input');
+      
+      nuevaFila.innerHTML = `
+        <td><input type="checkbox" class="selectFila"></td>
+        <td><input type="text" value="${nombreNuevo}"></td>
+        <td><input type="text" value="${superficieTotal.toFixed(2)}"></td>
+        <td><input type="text" value="${inputsPrimera[3].value}"></td>
+        <td><input type="text" value="${inputsPrimera[4].value}"></td>
+        <td><input type="text" value="${inputsPrimera[5].value}"></td>
+        <td><input type="text" value="${inputsPrimera[6].value}"></td>
+        <td><input type="text" value="${inputsPrimera[7].value}"></td>
+        <td><input type="color" value="${colorNuevo}" class="colorInput"></td>
+      `;
+      
+      tbody.appendChild(nuevaFila);
+      
+      // Eliminar filas originales de la tabla (en orden inverso)
+      indicesAEliminar.forEach(idx => {
+        const fila = document.querySelector(`#tablaPoligonos tbody tr[data-index="${idx}"]`);
+        if(fila) {
+          fila.remove();
+        }
+      });
+      
+      // Limpiar selección
+      seleccionados.clear();
+      
+      // Restaurar el zoom y centro del mapa (MANTENER COMO ESTABA)
+      map.setView(centroActual, zoomActual);
+      
+      // Limpiar campos de entrada
+      document.getElementById('nombreCombinado').value = '';
+      document.getElementById('colorCombinado').value = '#FF6B00';
+      
+      boton.disabled = false;
+      boton.textContent = '🔗 COMBINAR Y ELIMINAR ORIGINALES';
+      
+      const tipoResultado = poligonoCombinado.geometry.type === 'MultiPolygon' ? 
+        'polígonos separados' : 'polígono único';
+      
+      mostrarToast(
+        '✅ Polígonos combinados', 
+        `${poligonosTurf.length} polígonos → "${nombreNuevo}" (${superficieTotal.toFixed(2)} has) - ${tipoResultado}`, 
+        'success'
+      );
+      
+      // Regenerar filtro de colores
+      setTimeout(() => regenerarFiltroColores(), 200);
+      
+    } catch(error) {
+      console.error('Error al combinar:', error);
+      mostrarToast('Error', 'No se pudo combinar los polígonos: ' + error.message, 'error');
+      const boton = document.getElementById('btnCombinarPoligonos');
+      boton.disabled = false;
+      boton.textContent = '🔗 COMBINAR Y ELIMINAR ORIGINALES';
+    }
+  });
 }
 
 // === FILTRO DINÁMICO POR COLOR ===
@@ -563,10 +895,8 @@ function regenerarFiltroColores() {
   const selectColor = document.getElementById('filtroColor');
   const valorActual = selectColor.value;
   
-  // Limpiar opciones excepto la primera
   selectColor.innerHTML = '<option value="">Color</option>';
   
-  // Recolectar colores actuales de la tabla (no del JSON original)
   const coloresUnicos = new Map();
   
   document.querySelectorAll('#tablaPoligonos tbody tr').forEach(tr => {
@@ -580,11 +910,9 @@ function regenerarFiltroColores() {
     }
   });
   
-  // Ordenar por cantidad
   const coloresOrdenados = Array.from(coloresUnicos.entries())
     .sort((a, b) => b[1] - a[1]);
   
-  // Repoblar el select
   coloresOrdenados.forEach(([color, cantidad]) => {
     const option = document.createElement('option');
     option.value = color;
@@ -600,7 +928,6 @@ function regenerarFiltroColores() {
     selectColor.appendChild(option);
   });
   
-  // Restaurar valor seleccionado si aún existe
   if(valorActual && Array.from(selectColor.options).some(opt => opt.value === valorActual)) {
     selectColor.value = valorActual;
   }
@@ -625,7 +952,8 @@ function obtenerNombreColor(hex) {
     '#FFDAC1': 'DURAZNO',
     '#CBAACB': 'LAVANDA',
     '#E2F0CB': 'VERDE CLARO',
-    '#CCCCCC': 'GRIS CLARO'
+    '#CCCCCC': 'GRIS CLARO',
+    '#FF6B00': 'NARANJA INTENSO'
   };
   
   return coloresNombres[hex.toUpperCase()] || hex;
@@ -642,10 +970,8 @@ function esColorClaro(hex) {
 
 generarFiltroColores();
 
-// === DETECTAR CAMBIOS MANUALES EN COLORES DE LA TABLA ===
 document.querySelector('#tablaPoligonos tbody').addEventListener('change', function(e) {
   if(e.target.classList.contains('colorInput')) {
-    // Regenerar filtro cuando se cambia un color manualmente
     setTimeout(() => regenerarFiltroColores(), 100);
   }
 });
@@ -891,7 +1217,6 @@ document.getElementById('aplicarColor').addEventListener('click', ()=>{
   
   mostrarToast('Color aplicado', `Color aplicado a ${count} registros`, 'success');
   
-  // Regenerar filtro automáticamente
   regenerarFiltroColores();
 });
 
@@ -983,7 +1308,7 @@ function obtenerDatos(){
   document.querySelectorAll('#tablaPoligonos tbody tr').forEach(tr => {
     const idx = getFilaIndex(tr);
     const inputs = tr.querySelectorAll('input');
-    let coords = [];
+    let coords = '';
     if(leafletPoligonos[idx]){
       coords = leafletPoligonos[idx].getLatLngs()[0].map(p => `${p.lng},${p.lat}`).join(" ");
     }
@@ -996,6 +1321,7 @@ function obtenerDatos(){
       status3: inputs[6].value,
       partido: inputs[7].value,
       color: inputs[8].value,
+      colorOriginal: inputs[8].value,
       COORDENADAS: coords
     });
   });
@@ -1101,6 +1427,11 @@ document.getElementById("btnLimpiar").addEventListener("click", function() {
     document.querySelectorAll("#edicion-masiva input").forEach(input => input.value = "");
     document.querySelectorAll("#tablaPoligonos tbody tr").forEach(tr => tr.style.display = '');
     document.getElementById("colorBloque").value = "";
+    
+    if(esUsuarioDSUBICI) {
+      document.getElementById("nombreCombinado").value = "";
+      document.getElementById("colorCombinado").value = "#FF6B00";
+    }
     
     mostrarToast('Limpieza completada', 'Filtros y campos de edición limpiados', 'info');
 });

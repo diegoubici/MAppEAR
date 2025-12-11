@@ -526,6 +526,7 @@ tr.seleccionado { background-color:#FFFF99 !important; }
 <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
 
 <script>
 const poligonos = {{ poligonos|tojson }};
@@ -542,7 +543,40 @@ poligonos.forEach((p, idx)=>{
       .addTo(map)
       .bindPopup("<b>"+p.name+"</b><br>"+p.superficie+" has");
     poly.index = idx;
-    poly.on('click',()=>{ toggleSeleccion(idx); scrollFila(idx); });
+    poly.on('click',()=>{ 
+      toggleSeleccion(idx); 
+      scrollFila(idx);
+      
+      // NUEVO: Resaltar campo nombre SOLO para DSUBICI
+      if(esUsuarioDSUBICI) {
+        setTimeout(() => {
+          const fila = document.querySelector(`#tablaPoligonos tbody tr[data-index="${idx}"]`);
+          if(fila) {
+            const inputNombre = fila.querySelectorAll('input')[1];
+            if(inputNombre) {
+              inputNombre.focus();
+              if(inputNombre.value && inputNombre.value.trim() !== '') {
+                inputNombre.select();
+              } else {
+                inputNombre.setSelectionRange(0, 0);
+              }
+              
+              const estiloOriginalBg = inputNombre.style.backgroundColor;
+              const estiloOriginalBorder = inputNombre.style.border;
+              
+              inputNombre.style.backgroundColor = '#fff3cd';
+              inputNombre.style.border = '2px solid #ffc107';
+              inputNombre.style.transition = 'all 0.2s ease';
+              
+              setTimeout(() => {
+                inputNombre.style.backgroundColor = estiloOriginalBg;
+                inputNombre.style.border = estiloOriginalBorder;
+              }, 500);
+            }
+          }
+        }, 100);
+      }
+    });
     leafletPoligonos.push(poly);
   } else leafletPoligonos.push(null);
 });
@@ -580,9 +614,9 @@ function mostrarToast(titulo, detalle, tipo = 'success') {
   }, 3000);
 }
 
-// === COMBINAR POLÍGONOS (solo DSUBICI) ===
+// === COMBINAR POLÍGONOS CON UNIÓN GEOMÉTRICA (solo DSUBICI) ===
 if(esUsuarioDSUBICI) {
-  document.getElementById('btnCombinarPoligonos').addEventListener('click', async function() {
+  document.getElementById('btnCombinarPoligonos').addEventListener('click', function() {
     if(seleccionados.size < 2) {
       mostrarToast('Atención', 'Debe seleccionar al menos 2 polígonos para combinar', 'warning');
       return;
@@ -598,15 +632,19 @@ if(esUsuarioDSUBICI) {
     
     // Mostrar información de los polígonos seleccionados
     const nombresSeleccionados = [];
+    let superficieTotal = 0;
+    
     seleccionados.forEach(idx => {
       const fila = document.querySelector(`#tablaPoligonos tbody tr[data-index="${idx}"]`);
       if(fila) {
         const nombre = fila.querySelectorAll('input')[1].value;
+        const has = parseFloat(fila.querySelectorAll('input')[2].value) || 0;
         nombresSeleccionados.push(nombre);
+        superficieTotal += has;
       }
     });
     
-    const confirmMsg = `¿Confirma combinar estos ${seleccionados.size} polígonos?\n\n${nombresSeleccionados.join('\n')}\n\n➡️ En: "${nombreNuevo}"\n\n⚠️ Los polígonos originales serán eliminados.`;
+    const confirmMsg = `¿Confirma combinar estos ${seleccionados.size} polígonos?\n\n${nombresSeleccionados.join('\n')}\n\n➡️ En: "${nombreNuevo}"\n📏 Superficie total: ${superficieTotal.toFixed(2)} has\n\n⚠️ Los polígonos originales serán eliminados de la vista.`;
     
     if(!confirm(confirmMsg)) {
       return;
@@ -617,40 +655,301 @@ if(esUsuarioDSUBICI) {
       boton.disabled = true;
       boton.textContent = '⏳ COMBINANDO...';
       
-      mostrarToast('Procesando', `Combinando ${seleccionados.size} polígonos...`, 'info');
+      // Guardar el zoom y centro actual del mapa
+      const zoomActual = map.getZoom();
+      const centroActual = map.getCenter();
       
-      const response = await fetch('/combinar_poligonos', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-          indices: Array.from(seleccionados),
-          nombre: nombreNuevo,
-          color: colorNuevo,
-          datos: obtenerDatos()
-        })
+      // Recolectar todos los polígonos seleccionados y convertir a formato GeoJSON
+      const poligonosTurf = [];
+      const indicesAEliminar = Array.from(seleccionados).sort((a, b) => b - a);
+      
+      seleccionados.forEach(idx => {
+        if(leafletPoligonos[idx]) {
+          try {
+            const coords = leafletPoligonos[idx].getLatLngs()[0];
+            
+            // Convertir coordenadas Leaflet [lat, lng] a GeoJSON [lng, lat]
+            const coordsGeoJSON = coords.map(latlng => [latlng.lng, latlng.lat]);
+            
+            // Cerrar el polígono si no está cerrado
+            if(coordsGeoJSON.length > 0) {
+              const first = coordsGeoJSON[0];
+              const last = coordsGeoJSON[coordsGeoJSON.length-1];
+              if(first[0] !== last[0] || first[1] !== last[1]) {
+                coordsGeoJSON.push([first[0], first[1]]);
+              }
+            }
+            
+            // Validar que tenga al menos 4 puntos (3 + cierre)
+            if(coordsGeoJSON.length >= 4) {
+              const polygon = turf.polygon([coordsGeoJSON]);
+              poligonosTurf.push(polygon);
+            } else {
+              console.warn(`Polígono ${idx} tiene muy pocos puntos, se omitirá`);
+            }
+          } catch(e) {
+            console.error(`Error al procesar polígono ${idx}:`, e);
+          }
+        }
       });
       
-      const result = await response.json();
-      
-      if(result.success) {
-        mostrarToast(result.mensaje, result.detalle, result.tipo);
-        
-        // Recargar la página después de 2 segundos
-        setTimeout(() => {
-          window.location.reload();
-        }, 2000);
-      } else {
-        mostrarToast(result.mensaje, result.detalle || 'No se pudo completar la operación', 'error');
-        boton.disabled = false;
-        boton.textContent = '🔗 COMBINAR Y ELIMINAR ORIGINALES';
+      // Validar que tengamos polígonos válidos
+      if(poligonosTurf.length === 0) {
+        throw new Error('No se pudieron procesar los polígonos seleccionados');
       }
       
+      console.log(`Procesando ${poligonosTurf.length} polígonos válidos`);
+      
+      // Combinar todos los polígonos usando unión geométrica
+      let poligonoCombinado = null;
+      let usarConvexHull = false;
+      
+      try {
+        poligonoCombinado = poligonosTurf[0];
+        
+        for(let i = 1; i < poligonosTurf.length; i++) {
+          try {
+            const unionResult = turf.union(poligonoCombinado, poligonosTurf[i]);
+            if(unionResult && unionResult.geometry) {
+              poligonoCombinado = unionResult;
+            } else {
+              console.warn('Union retornó null, usando convex hull');
+              usarConvexHull = true;
+              break;
+            }
+          } catch(e) {
+            console.warn('Error en turf.union, usando convex hull:', e);
+            usarConvexHull = true;
+            break;
+          }
+        }
+      } catch(e) {
+        console.error('Error general en combinación:', e);
+        usarConvexHull = true;
+      }
+      
+      // Si falló la unión o el resultado es null, usar convex hull
+      if(usarConvexHull || !poligonoCombinado || !poligonoCombinado.geometry) {
+        console.log('Usando convex hull como método alternativo');
+        const allPoints = [];
+        poligonosTurf.forEach(poly => {
+          try {
+            const coords = turf.getCoords(poly)[0];
+            coords.forEach(coord => {
+              if(coord && coord.length === 2) {
+                allPoints.push(coord);
+              }
+            });
+          } catch(e) {
+            console.error('Error al extraer coordenadas:', e);
+          }
+        });
+        
+        if(allPoints.length > 0) {
+          const points = turf.points(allPoints);
+          poligonoCombinado = turf.convex(points);
+        }
+      }
+      
+      // Validación final
+      if(!poligonoCombinado || !poligonoCombinado.geometry) {
+        throw new Error('No se pudo crear el polígono combinado. Intente seleccionar otros polígonos.');
+      }
+      
+      console.log('Polígono combinado creado:', poligonoCombinado.geometry.type);
+      
+      // Extraer coordenadas del polígono combinado
+      let coordsFinales;
+      
+      // Si es MultiPolygon, tomar todas las geometrías
+      if(poligonoCombinado.geometry.type === 'MultiPolygon') {
+        coordsFinales = poligonoCombinado.geometry.coordinates;
+        console.log('Tipo: MultiPolygon con', coordsFinales.length, 'polígonos');
+      } else if(poligonoCombinado.geometry.type === 'Polygon') {
+        // Es un solo Polygon, tomar solo el anillo exterior
+        coordsFinales = [poligonoCombinado.geometry.coordinates[0]];
+        console.log('Tipo: Polygon con', coordsFinales[0].length, 'puntos');
+      } else {
+        throw new Error('Tipo de geometría no soportado: ' + poligonoCombinado.geometry.type);
+      }
+      
+      // Validar que tenemos coordenadas
+      if(!coordsFinales || coordsFinales.length === 0) {
+        throw new Error('El polígono combinado no tiene coordenadas válidas');
+      }
+      
+      // Convertir de vuelta a formato Leaflet [lat, lng]
+      // GeoJSON usa [lng, lat], Leaflet usa [lat, lng]
+      let coordsLeaflet;
+      
+      if(poligonoCombinado.geometry.type === 'MultiPolygon') {
+        // Para MultiPolygon: array de arrays de arrays
+        coordsLeaflet = coordsFinales.map(polygon => {
+          return polygon[0].map(coord => [coord[1], coord[0]]);
+        });
+      } else {
+        // Para Polygon: array de arrays (un solo polígono)
+        coordsLeaflet = coordsFinales[0].map(coord => [coord[1], coord[0]]);
+      }
+      
+      console.log('Coordenadas Leaflet generadas:', coordsLeaflet.length, 'elementos');
+      
+      // Crear el nuevo polígono combinado en el mapa
+      let nuevoPoly;
+      
+      try {
+        nuevoPoly = L.polygon(coordsLeaflet, {
+          color: "#000000",
+          weight: 0.5,
+          fillColor: colorNuevo,
+          fillOpacity: 0.6
+        }).addTo(map);
+        
+        console.log('✅ Polígono creado y agregado al mapa exitosamente');
+      } catch(e) {
+        console.error('Error al crear L.polygon:', e);
+        throw new Error('No se pudo crear el polígono en Leaflet: ' + e.message);
+      }
+      
+      // Asignar índice al nuevo polígono
+      const nuevoIdx = leafletPoligonos.length;
+      nuevoPoly.index = nuevoIdx;
+      nuevoPoly.bindPopup("<b>" + nombreNuevo + "</b><br>" + superficieTotal.toFixed(2) + " has");
+      nuevoPoly.on('click', () => { 
+        toggleSeleccion(nuevoIdx); 
+        scrollFila(nuevoIdx);
+        
+        // Resaltar campo nombre SOLO para DSUBICI
+        if(esUsuarioDSUBICI) {
+          setTimeout(() => {
+            const fila = document.querySelector(`#tablaPoligonos tbody tr[data-index="${nuevoIdx}"]`);
+            if(fila) {
+              const inputNombre = fila.querySelectorAll('input')[1];
+              if(inputNombre) {
+                inputNombre.focus();
+                if(inputNombre.value && inputNombre.value.trim() !== '') {
+                  inputNombre.select();
+                } else {
+                  inputNombre.setSelectionRange(0, 0);
+                }
+                
+                const estiloOriginalBg = inputNombre.style.backgroundColor;
+                const estiloOriginalBorder = inputNombre.style.border;
+                
+                inputNombre.style.backgroundColor = '#fff3cd';
+                inputNombre.style.border = '2px solid #ffc107';
+                inputNombre.style.transition = 'all 0.2s ease';
+                
+                setTimeout(() => {
+                  inputNombre.style.backgroundColor = estiloOriginalBg;
+                  inputNombre.style.border = estiloOriginalBorder;
+                }, 500);
+              }
+            }
+          }, 100);
+        }
+      });
+      
+      // Agregar a la lista de polígonos de Leaflet
+      leafletPoligonos.push(nuevoPoly);
+      
+      console.log(`Nuevo polígono agregado con índice ${nuevoIdx}`);
+      
+      // Eliminar los polígonos originales del mapa
+      let eliminados = 0;
+      indicesAEliminar.forEach(idx => {
+        if(leafletPoligonos[idx]) {
+          map.removeLayer(leafletPoligonos[idx]);
+          leafletPoligonos[idx] = null;
+          eliminados++;
+        }
+      });
+      
+      console.log(`${eliminados} polígonos originales eliminados del mapa`);
+      
+      // Agregar fila en la tabla para el nuevo polígono combinado
+      const tbody = document.querySelector('#tablaPoligonos tbody');
+      const nuevaFila = document.createElement('tr');
+      nuevaFila.setAttribute('data-index', nuevoIdx);
+      
+      // Obtener datos del primer polígono seleccionado para status, partido, etc.
+      const primeraFilaSeleccionada = document.querySelector(`#tablaPoligonos tbody tr[data-index="${Array.from(seleccionados)[0]}"]`);
+      const inputsPrimera = primeraFilaSeleccionada.querySelectorAll('input');
+      
+      nuevaFila.innerHTML = `
+        <td><input type="checkbox" class="selectFila"></td>
+        <td><input type="text" value="${nombreNuevo}"></td>
+        <td><input type="text" value="${superficieTotal.toFixed(2)}"></td>
+        <td><input type="text" value="${inputsPrimera[3].value}"></td>
+        <td><input type="text" value="${inputsPrimera[4].value}"></td>
+        <td><input type="text" value="${inputsPrimera[5].value}"></td>
+        <td><input type="text" value="${inputsPrimera[6].value}"></td>
+        <td><input type="text" value="${inputsPrimera[7].value}"></td>
+        <td><input type="color" value="${colorNuevo}" class="colorInput"></td>
+      `;
+      
+      tbody.appendChild(nuevaFila);
+      
+      console.log('Fila agregada a la tabla');
+      
+      // Eliminar filas originales de la tabla (en orden inverso)
+      let filasEliminadas = 0;
+      indicesAEliminar.forEach(idx => {
+        const fila = document.querySelector(`#tablaPoligonos tbody tr[data-index="${idx}"]`);
+        if(fila) {
+          fila.remove();
+          filasEliminadas++;
+        }
+      });
+      
+      console.log(`${filasEliminadas} filas eliminadas de la tabla`);
+      
+      // Limpiar selección
+      seleccionados.clear();
+      
+      // Restaurar el zoom y centro del mapa (MANTENER COMO ESTABA)
+      map.setView(centroActual, zoomActual);
+      
+      // Limpiar campos de entrada
+      document.getElementById('nombreCombinado').value = '';
+      document.getElementById('colorCombinado').value = '#FF6B00';
+      
+      boton.disabled = false;
+      boton.textContent = '🔗 COMBINAR Y ELIMINAR ORIGINALES';
+      
+      const tipoResultado = poligonoCombinado.geometry.type === 'MultiPolygon' ? 
+        'polígonos separados' : 'polígono único';
+      
+      const metodo = usarConvexHull ? ' (convex hull)' : '';
+      
+      mostrarToast(
+        '✅ Polígonos combinados', 
+        `${poligonosTurf.length} polígonos → "${nombreNuevo}" (${superficieTotal.toFixed(2)} has) - ${tipoResultado}${metodo}`, 
+        'success'
+      );
+      
+      // Regenerar filtro de colores
+      setTimeout(() => regenerarFiltroColores(), 200);
+      
+      console.log('✅ Proceso de combinación completado exitosamente');
+      
     } catch(error) {
-      console.error('Error:', error);
-      mostrarToast('Error', 'No se pudo combinar los polígonos: ' + error.message, 'error');
+      console.error('❌ Error al combinar polígonos:', error);
+      
+      // Restaurar botón
       const boton = document.getElementById('btnCombinarPoligonos');
       boton.disabled = false;
       boton.textContent = '🔗 COMBINAR Y ELIMINAR ORIGINALES';
+      
+      // Mostrar error detallado
+      mostrarToast(
+        '❌ Error al combinar', 
+        error.message || 'No se pudo completar la combinación. Verifique los polígonos seleccionados.', 
+        'error'
+      );
+      
+      // NO eliminar los polígonos originales si hubo error
+      // Ya están en el mapa, no hacer nada
     }
   });
 }

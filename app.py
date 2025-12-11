@@ -376,6 +376,43 @@ def abrir_archivo(nombre):
                          poligonos=poligonos,
                          archivo_nombre=nombre_sin_extension)
 
+@app.route("/descargar/<nombre>")
+def descargar_archivo(nombre):
+    """Descarga un archivo Excel desde R2 o local"""
+    if "usuario" not in session:
+        return redirect(url_for("login_page"))
+    
+    user = session["usuario"]
+    
+    try:
+        print(f"📥 Descargando archivo: {nombre} para usuario: {user}")
+        
+        # Leer el archivo
+        bio = leer_archivo(user, nombre)
+        
+        if not bio:
+            print(f"❌ Archivo no encontrado: {nombre}")
+            return f"❌ No se pudo obtener '{nombre}'.", 404
+        
+        # Preparar para descarga
+        from flask import send_file
+        bio.seek(0)  # Volver al inicio del archivo
+        
+        print(f"✅ Enviando archivo para descarga: {nombre}")
+        
+        return send_file(
+            bio,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            as_attachment=True,
+            download_name=nombre
+        )
+        
+    except Exception as e:
+        print(f"❌ Error descargando archivo: {e}")
+        import traceback
+        traceback.print_exc()
+        return f"Error al descargar: {str(e)}", 500
+
 @app.route("/guardar", methods=["POST"])
 def guardar():
     if "usuario" not in session:
@@ -654,28 +691,37 @@ def combinar_poligonos():
         print(f"📊 Superficie total combinada: {superficie_total} has")
         print(f"📄 Total final de polígonos: {len(nuevos_datos)}")
         
-        # GUARDAR AUTOMÁTICAMENTE EL ARCHIVO
-        user = session.get("usuario")
-        exito = guardar_poligonos(nuevos_datos, user, archivo_sel)
+        # VERIFICACIÓN: Mostrar nombres de los primeros 5 polígonos
+        print(f"\n📋 Verificación de datos finales (primeros 5):")
+        for i, pol in enumerate(nuevos_datos[:5]):
+            print(f"  [{i}] {pol.get('name', 'Sin nombre')} - {pol.get('superficie', '0')} has - Color: {pol.get('color', 'N/A')}")
+        if len(nuevos_datos) > 5:
+            print(f"  ... y {len(nuevos_datos) - 5} más")
         
-        if not exito:
-            return jsonify({
-                "success": False,
-                "mensaje": "Error al guardar los cambios",
-                "tipo": "error"
-            })
+        # NO GUARDAR AUTOMÁTICAMENTE - Solo devolver los datos actualizados
+        print(f"\n⚠️ IMPORTANTE: Los cambios NO se guardan automáticamente")
+        print(f"   El usuario debe hacer clic en GUARDAR para persistir los cambios")
         
         # Mensaje personalizado según el resultado
         if len(nuevos_poligonos) == 1:
-            detalle_msg = f"{len(indices)} polígonos combinados en '{nombre_nuevo}'. Recargando..."
+            detalle_msg = f"{len(indices)} polígonos combinados en '{nombre_nuevo}'. ¡Recuerda GUARDAR los cambios!"
         else:
-            detalle_msg = f"Se crearon {len(nuevos_poligonos)} polígonos separados porque NO todos se tocan. Recargando..."
+            detalle_msg = f"Se crearon {len(nuevos_poligonos)} polígonos separados. ¡Recuerda GUARDAR los cambios!"
         
         return jsonify({
             "success": True,
-            "mensaje": "Polígonos procesados exitosamente",
+            "mensaje": "Polígonos combinados exitosamente",
             "detalle": detalle_msg,
-            "tipo": "success" if len(nuevos_poligonos) == 1 else "warning"
+            "tipo": "success" if len(nuevos_poligonos) == 1 else "warning",
+            "nuevos_datos": nuevos_datos,  # TODOS los polígonos actualizados
+            "indices_eliminados": list(indices_con_coordenadas),
+            "nuevos_poligonos": nuevos_poligonos,
+            "estadisticas": {
+                "total_antes": len(todos_datos),
+                "total_despues": len(nuevos_datos),
+                "eliminados": len(indices_con_coordenadas),
+                "creados": len(nuevos_poligonos)
+            }
         })
         
     except Exception as e:

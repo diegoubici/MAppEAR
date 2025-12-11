@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Seleccionar Archivo - {{ usuario }}</title>
+<style>
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  body {
+    font-family: Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 20px;
+    /* Imagen de fondo - LA MISMA que login */
+    background-image: url("{{ url_for('static', filename='images/fondo-login.jpg') }}");
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-attachment: fixed;
+    position: relative;
+  }
+
+  /* Overlay oscuro */
+  body::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 0;
+  }
+
+  h2 {
+    color: white;
+    margin-bottom: 10px;
+    position: relative;
+    z-index: 1;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
+  }
+
+  .subtitle {
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 14px;
+    margin-bottom: 20px;
+    position: relative;
+    z-index: 1;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.7);
+  }
+
+  form {
+    background: rgba(255, 255, 255, 0.95);
+    padding: 25px;
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+    width: 100%;
+    max-width: 400px;
+    position: relative;
+    z-index: 1;
+    backdrop-filter: blur(10px);
+  }
+
+  label {
+    font-weight: bold;
+    font-size: 14px;
+    display: block;
+    margin-bottom: 5px;
+    color: #333;
+  }
+
+  select {
+    width: 100%;
+    padding: 10px;
+    margin: 6px 0 12px 0;
+    font-size: 14px;
+    border-radius: 5px;
+    border: 1px solid #ccc;
+    box-sizing: border-box;
+    background-color: rgba(255, 255, 255, 0.9);
+  }
+
+  button {
+    width: 100%;
+    padding: 10px;
+    margin: 6px 0 12px 0;
+    font-size: 14px;
+    border-radius: 5px;
+    border: none;
+    background-color: #0056b3;
+    color: white;
+    cursor: pointer;
+    transition: background 0.2s;
+    font-weight: bold;
+  }
+
+  button:hover {
+    background-color: #003f80;
+  }
+
+  button:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+  }
+
+  .footer {
+    text-align: center;
+    margin-top: 20px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .logout-btn {
+    display: inline-block;
+    background-color: #dc3545;
+    color: white;
+    padding: 10px 20px;
+    border-radius: 5px;
+    text-decoration: none;
+    border: none;
+    cursor: pointer;
+    transition: background 0.2s;
+    font-weight: bold;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+  }
+
+  .logout-btn:hover {
+    background-color: #b52a37;
+  }
+
+  .no-files {
+    background-color: rgba(255, 243, 205, 0.95);
+    border-left: 4px solid #ffc107;
+    padding: 15px;
+    margin: 20px 0;
+    border-radius: 5px;
+    max-width: 400px;
+    font-size: 14px;
+    color: #856404;
+    position: relative;
+    z-index: 1;
+    backdrop-filter: blur(10px);
+  }
+
+  @media (max-width: 480px) {
+    form {
+      padding: 20px;
+    }
+    
+    h2 {
+      font-size: 24px;
+    }
+  }
+</style>
+</head>
+<body>
+
+  <h2>Archivos de {{ usuario }}</h2>
+  <div class="subtitle">Selecciona un archivo para abrir y editar</div>
+
+  {% if archivos %}
+  <form id="formAbrir">
+    <label>Seleccionar archivo:</label>
+    <select name="archivo_existente" id="selectArchivo" required>
+      <option value="">-- Elegir archivo --</option>
+      {% for a in archivos %}
+      <option value="{{ a }}">{{ a }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit">Abrir archivo</button>
+  </form>
+  {% else %}
+  <div class="no-files">
+    <strong>⚠️ No hay archivos disponibles</strong><br>
+    No se encontraron archivos .xlsx en tu carpeta de R2.<br>
+    Sube archivos manualmente a R2 en la ruta: <code>{{ usuario }}/</code>
+  </div>
+  {% endif %}
+
+  <div class="footer">
+    <a href="/logout" class="logout-btn">Cerrar sesión</a>
+  </div>
+
+<script>
+document.getElementById("formAbrir")?.addEventListener("submit", function(e) {
+    e.preventDefault();
+    const archivo = document.getElementById("selectArchivo").value;
+    if (archivo) {
+        window.location.href = "/abrir/" + encodeURIComponent(archivo);
+    } else {
+        alert("Por favor selecciona un archivo");
+    }
+});
+</script>
+
+</body>
+</html>

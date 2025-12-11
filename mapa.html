@@ -1,0 +1,1441 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Mapa de Polígonos</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css">
+<style>
+body { font-family: Arial, sans-serif; margin:0; padding:0; overflow:hidden; }
+header { background-color: #0056b3; color: white; padding: 10px; height:50px; }
+header h2 { margin:0; font-size:18px; display:inline-block; }
+header span { float:right; line-height:30px; }
+
+#map { position: fixed; top: 50px; left: 0; width: 100%; height: calc(100% - 50px); z-index:0; }
+
+#tabla-container {
+  position: absolute;
+  top: 50px;
+  right: 0;
+  width: 50%;
+  height: calc(100% - 50px);
+  background: #ffffffd9;
+  border: 2px solid #999;
+  border-radius: 8px;
+  overflow: hidden;
+  z-index: 1000;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  display: flex;
+  flex-direction: column;
+}
+
+#tabla-header { background-color: #0056b3; color:white; padding:5px; cursor: move; font-weight:bold; text-align:center; border-radius:5px 5px 0 0; }
+#tabla-body { display:flex; flex-direction:column; flex:1; overflow:hidden; padding:0; }
+
+#botonera, #filtros, #edicion-masiva {
+  flex-shrink: 0;
+  padding: 5px;
+  background:#f7f7f7;
+  border-bottom:1px solid #ccc;
+}
+
+#edicion-masiva {
+  background: #e8f4f8;
+  border: 1px solid #0056b3;
+  margin: 2px;
+  border-radius: 4px;
+}
+
+#edicion-masiva .titulo-edicion {
+  font-weight: bold;
+  color: #0056b3;
+  margin-bottom: 5px;
+  text-align: center;
+}
+
+#edicion-masiva .fila-edicion {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+#edicion-masiva input {
+  border: 1px solid #ccc;
+  background: white;
+  padding: 2px 4px;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+/* === SECCIÓN COMBINAR POLÍGONOS === */
+#combinar-poligonos {
+  background: #fff3cd;
+  border: 2px solid #ff6b00;
+  margin: 2px;
+  padding: 8px;
+  border-radius: 4px;
+  display: none; /* Oculto por defecto, se muestra solo para DSUBICI */
+}
+
+#combinar-poligonos .titulo-combinar {
+  font-weight: bold;
+  color: #ff6b00;
+  margin-bottom: 8px;
+  text-align: center;
+  font-size: 13px;
+}
+
+#combinar-poligonos .fila-combinar {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 5px;
+}
+
+#combinar-poligonos input[type="text"] {
+  flex: 1;
+  border: 1px solid #ccc;
+  background: white;
+  padding: 4px 8px;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+#combinar-poligonos input[type="color"] {
+  width: 50px;
+  height: 28px;
+  border: 1px solid #ccc;
+  cursor: pointer;
+}
+
+#btnCombinarPoligonos {
+  background-color: #ff6b00;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: bold;
+  width: 100%;
+}
+
+#btnCombinarPoligonos:hover {
+  background-color: #e55b00;
+}
+
+#btnCombinarPoligonos:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+}
+
+#tabla-scroll {
+  flex:1;
+  overflow-y:auto;
+  padding:5px;
+}
+
+#botonera-inferior {
+  flex-shrink: 0;
+  background:#f7f7f7;
+  border-top:1px solid #ccc;
+  padding:8px;
+  text-align:center;
+}
+
+#tablaPoligonos {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+#tablaPoligonos thead th { 
+  background-color:#0056b3; 
+  color:white; 
+  font-weight:bold; 
+  font-size:11px; 
+  text-align:left;
+  padding: 4px;
+  user-select: none;
+}
+
+#tablaPoligonos thead th.sortable {
+  cursor: pointer;
+  position: relative;
+  padding-right: 20px;
+}
+
+#tablaPoligonos thead th.sortable:hover {
+  background-color: #003f80;
+}
+
+#tablaPoligonos thead th.sortable:after {
+  content: '⇅';
+  position: absolute;
+  right: 5px;
+  opacity: 0.5;
+  font-size: 12px;
+}
+
+#tablaPoligonos thead th.sortable.asc:after {
+  content: '▲';
+  opacity: 1;
+  color: yellow;
+}
+
+#tablaPoligonos thead th.sortable.desc:after {
+  content: '▼';
+  opacity: 1;
+  color: yellow;
+}
+
+#tablaPoligonos tbody tr { height:24px; }
+#tablaPoligonos td { text-align:left; vertical-align:middle; padding: 2px 4px; }
+#tablaPoligonos td input { 
+  width: 95%; 
+  border:none; 
+  background:transparent; 
+  font-size:11px; 
+  padding:1px; 
+  box-sizing:border-box; 
+  text-transform:uppercase; 
+}
+
+#tablaPoligonos td input:hover, 
+#tablaPoligonos td input:focus { background:#eef; outline:none; }
+#tablaPoligonos input[type="color"] { width:30px; height:20px; padding:0; border:none; }
+
+/* === ANCHOS PERSONALIZADOS DE COLUMNAS === */
+.col-sel { 
+  width: 40px; 
+  min-width: 40px; 
+  max-width: 40px; 
+}
+
+.col-nombre { 
+  width: 200px; 
+  min-width: 200px; 
+  max-width: 200px; 
+}
+
+.col-has { 
+  width: 60px; 
+  min-width: 60px; 
+  max-width: 60px; 
+}
+
+.col-status { 
+  width: 75px; 
+  min-width: 75px; 
+  max-width: 75px; 
+}
+
+.col-status1 { 
+  width: 75px; 
+  min-width: 75px; 
+  max-width: 75px; 
+}
+
+.col-status2 { 
+  width: 75px; 
+  min-width: 75px; 
+  max-width: 75px; 
+}
+
+.col-status3 { 
+  width: 75px; 
+  min-width: 75px; 
+  max-width: 75px; 
+}
+
+.col-partido { 
+  width: 100px; 
+  min-width: 100px; 
+  max-width: 100px; 
+}
+
+.col-color { 
+  width: 50px; 
+  min-width: 50px; 
+  max-width: 50px; 
+}
+
+button { 
+  margin-top:2px; 
+  background-color:#0056b3; 
+  color:white; 
+  border:none; 
+  padding:6px 10px; 
+  cursor:pointer; 
+  border-radius:4px; 
+  font-size:11px; 
+}
+button:hover { background-color:#003f80; }
+
+#editarColumnas { background-color:#28a745; }
+#editarColumnas:hover { background-color:#1e7e34; }
+
+tr.seleccionado { background-color:#FFFF99 !important; }
+
+.menu-grabar { 
+  display:none; 
+  position:absolute; 
+  background:white; 
+  border:1px solid #ccc; 
+  border-radius:8px; 
+  box-shadow:0 2px 8px rgba(0,0,0,0.2); 
+  min-width:160px; 
+  z-index:2000; 
+  bottom:60px; 
+  right:60px; 
+}
+.menu-grabar div { padding:8px 12px; font-size:11px; cursor:pointer; }
+.menu-grabar div:hover { background:#f0f0f0; }
+
+/* === TOAST NOTIFICATIONS === */
+.toast {
+  position: fixed;
+  bottom: 30px;
+  right: 30px;
+  min-width: 320px;
+  max-width: 450px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+  padding: 0;
+  z-index: 10000;
+  animation: slideIn 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+}
+
+.toast.hiding {
+  animation: slideOut 0.3s ease-in forwards;
+}
+
+.toast-header {
+  padding: 16px 20px;
+  font-weight: 600;
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid rgba(0,0,0,0.08);
+}
+
+.toast-body {
+  padding: 14px 20px;
+  font-size: 13px;
+  color: #555;
+  line-height: 1.5;
+}
+
+.toast-icon {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.toast.success .toast-header {
+  background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+  color: white;
+}
+
+.toast.error .toast-header {
+  background: linear-gradient(135deg, #eb3349 0%, #f45c43 100%);
+  color: white;
+}
+
+.toast.warning .toast-header {
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  color: white;
+}
+
+.toast.info .toast-header {
+  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+  color: white;
+}
+
+@keyframes slideIn {
+  from { 
+    transform: translateX(450px) scale(0.8);
+    opacity: 0;
+  }
+  to { 
+    transform: translateX(0) scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes slideOut {
+  from { 
+    transform: translateX(0) scale(1);
+    opacity: 1;
+  }
+  to { 
+    transform: translateX(450px) scale(0.8);
+    opacity: 0;
+  }
+}
+
+#filtroColor {
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+#filtroColor option {
+  padding: 4px;
+  font-weight: bold;
+}
+
+</style>
+</head>
+<body>
+
+<header>
+<h2>MAppEAR - {{ archivo_nombre }} - {{ usuario }}</h2>
+<span><a href="/logout" style="color:white;">Cerrar sesión</a></span>
+</header>
+
+<div id="map"></div>
+
+<div id="tabla-container">
+  <div id="tabla-header">FILTRAR ATRIBUTOS</div>
+
+  <div id="tabla-body">
+    <div id="botonera">
+      <label>Color en bloque:</label>
+      <select id="colorBloque">
+        <option value="">-- ELEGIR COLOR --</option>
+        {% for c in [
+            {"nombre":"ROJO","codigo":"#FF0000"},{"nombre":"VERDE","codigo":"#00FF00"},{"nombre":"AZUL","codigo":"#0000FF"},
+            {"nombre":"VERDE MENTA","codigo":"#B5EAD7"},{"nombre":"DURAZNO SUAVE","codigo":"#FFDAC1"},{"nombre":"LAVANDA","codigo":"#CBAACB"},
+            {"nombre":"VERDE CLARO","codigo":"#E2F0CB"},{"nombre":"AMARILLO","codigo":"#FFFF00"},{"nombre":"NARANJA","codigo":"#FFA500"},
+            {"nombre":"MORADO","codigo":"#800080"},{"nombre":"CYAN","codigo":"#00FFFF"},{"nombre":"MAGENTA","codigo":"#FF00FF"},
+            {"nombre":"GRIS","codigo":"#808080"},{"nombre":"NEGRO","codigo":"#000000"},{"nombre":"BLANCO","codigo":"#FFFFFF"}
+        ] %}
+        <option value="{{ c.codigo }}">{{ c.nombre }}</option>
+        {% endfor %}
+      </select>
+      <button id="aplicarColor">Aplicar</button>
+      <button id="seleccionarFiltrados" style="background-color:#28a745;">Seleccionar</button>
+      <button id="deseleccionarTodos" style="background-color:#dc3545;">Deseleccionar</button>
+      <button id="btnLimpiar" style="background-color:#ffc107;">LIMPIAR</button>
+    </div>
+
+    <div id="filtros">
+      <span style="width:40px; display:inline-block;"></span>
+      <input type="text" placeholder="Nombre" data-col="1" style="width:150px;">
+      <input type="text" placeholder="Has" data-col="2" style="width:40px;">
+      <input type="text" placeholder="Status" data-col="3" style="width:56px;">
+      <input type="text" placeholder="Status1" data-col="4" style="width:56px;">
+      <input type="text" placeholder="Status2" data-col="5" style="width:56px;">
+      <input type="text" placeholder="Status3" data-col="6" style="width:56px;">
+      <input type="text" placeholder="Partido" data-col="7" style="width:80px;">
+      <select id="filtroColor" data-col="8" style="width:70px; font-size:10px; padding:2px;">
+        <option value="">Color</option>
+      </select>
+    </div>
+
+    <!-- SECCIÓN COMBINAR POLÍGONOS (solo para DSUBICI) -->
+    {% if usuario == "DSUBICI" %}
+    <div id="combinar-poligonos">
+      <div class="titulo-combinar">🔗 COMBINAR POLÍGONOS SELECCIONADOS</div>
+      <div style="background: #e7f3ff; border: 1px solid #2196F3; padding: 6px 8px; border-radius: 3px; margin-bottom: 5px; font-size: 10px; line-height: 1.4;">
+        ℹ️ <strong>IMPORTANTE:</strong><br>
+        • Si los polígonos <strong>se tocan</strong> → Se combinan en UNO solo ✅<br>
+        • Si NO se tocan → Se crean <strong>VARIOS polígonos separados</strong> (uno por cada grupo)
+      </div>
+      <div class="fila-combinar">
+        <input type="text" id="nombreCombinado" placeholder="Nombre del polígono combinado">
+        <input type="color" id="colorCombinado" value="#FF6B00" title="Color del polígono combinado">
+      </div>
+      <button id="btnCombinarPoligonos">🔗 COMBINAR Y ELIMINAR ORIGINALES</button>
+    </div>
+    {% endif %}
+
+    <div id="edicion-masiva">
+      <div class="titulo-edicion">✏️ EDICIÓN MASIVA DE COLUMNAS</div>
+      <div class="fila-edicion">
+        <input type="text" id="edit-nombre" placeholder="Nombre" style="width:150px;">
+        <input type="text" id="edit-has" placeholder="Has" style="width:40px;">
+        <input type="text" id="edit-status" placeholder="Status" style="width:65px;">
+        <input type="text" id="edit-status1" placeholder="Status1" style="width:60px;">
+        <input type="text" id="edit-status2" placeholder="Status2" style="width:60px;">
+        <input type="text" id="edit-status3" placeholder="Status3" style="width:60px;">
+        <input type="text" id="edit-partido" placeholder="Partido" style="width:90px;">
+        <button id="editarColumnas">✏️ EDITAR COLUMNAS</button>
+      </div>
+    </div>
+
+    <div id="tabla-scroll">
+      <table id="tablaPoligonos">
+        <colgroup>
+          <col class="col-sel">
+          <col class="col-nombre">
+          <col class="col-has">
+          <col class="col-status">
+          <col class="col-status1">
+          <col class="col-status2">
+          <col class="col-status3">
+          <col class="col-partido">
+          <col class="col-color">
+        </colgroup>
+        <thead>
+          <tr>
+            <th>Sel</th>
+            <th class="sortable" data-col="1">Nombre Productor</th>
+            <th class="sortable" data-col="2">Has</th>
+            <th class="sortable" data-col="3">Status</th>
+            <th class="sortable" data-col="4">Status1</th>
+            <th class="sortable" data-col="5">Status2</th>
+            <th class="sortable" data-col="6">Status3</th>
+            <th class="sortable" data-col="7">Ptdo</th>
+            <th>Color</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for p in poligonos %}
+          <tr data-index="{{ loop.index0 }}">
+            <td><input type="checkbox" class="selectFila"></td>
+            <td><input type="text" value="{{ p.name }}"></td>
+            <td><input type="text" value="{{ p.superficie }}"></td>
+            <td><input type="text" value="{{ p.status }}"></td>
+            <td><input type="text" value="{{ p.status1 }}"></td>
+            <td><input type="text" value="{{ p.status2 }}"></td>
+            <td><input type="text" value="{{ p.status3 }}"></td>
+            <td><input type="text" value="{{ p.partido }}"></td>
+            <td><input type="color" value="{{ p.color }}" class="colorInput"></td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div id="botonera-inferior">
+      <button id="btn-grabar">💾 GUARDAR ▼</button>
+      <button id="exportarPDF" style="background-color:#28a745;">📄 EXPORTAR PDF</button>
+      <div id="menu-grabar" class="menu-grabar">
+        <div id="opcion-grabar">💾 Guardar cambios</div>
+        <div id="opcion-grabar-como">📝 Guardar como...</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
+
+<script>
+const poligonos = {{ poligonos|tojson }};
+const leafletPoligonos = [];
+const seleccionados = new Set();
+const esUsuarioDSUBICI = "{{ usuario }}" === "DSUBICI";
+
+const map = L.map('map').setView([-35, -63], 8);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{ attribution:'&copy; OpenStreetMap' }).addTo(map);
+
+poligonos.forEach((p, idx)=>{
+  if(p.coords && p.coords.length>0){
+    const poly = L.polygon(p.coords,{color:"#000000",weight:0.5,fillColor:p.color,fillOpacity:0.6})
+      .addTo(map)
+      .bindPopup("<b>"+p.name+"</b><br>"+p.superficie+" has");
+    poly.index = idx;
+    poly.on('click',()=>{ 
+      toggleSeleccion(idx); 
+      scrollFila(idx);
+      
+      // NUEVO: Resaltar campo nombre SOLO para DSUBICI
+      if(esUsuarioDSUBICI) {
+        setTimeout(() => {
+          const fila = document.querySelector(`#tablaPoligonos tbody tr[data-index="${idx}"]`);
+          if(fila) {
+            const inputNombre = fila.querySelectorAll('input')[1];
+            if(inputNombre) {
+              inputNombre.focus();
+              if(inputNombre.value && inputNombre.value.trim() !== '') {
+                inputNombre.select();
+              } else {
+                inputNombre.setSelectionRange(0, 0);
+              }
+              
+              const estiloOriginalBg = inputNombre.style.backgroundColor;
+              const estiloOriginalBorder = inputNombre.style.border;
+              
+              inputNombre.style.backgroundColor = '#fff3cd';
+              inputNombre.style.border = '2px solid #ffc107';
+              inputNombre.style.transition = 'all 0.2s ease';
+              
+              setTimeout(() => {
+                inputNombre.style.backgroundColor = estiloOriginalBg;
+                inputNombre.style.border = estiloOriginalBorder;
+              }, 500);
+            }
+          }
+        }, 100);
+      }
+    });
+    leafletPoligonos.push(poly);
+  } else leafletPoligonos.push(null);
+});
+
+// Mostrar sección de combinar solo para DSUBICI
+if(esUsuarioDSUBICI) {
+  document.getElementById('combinar-poligonos').style.display = 'block';
+}
+
+// === FUNCIÓN TOAST ===
+function mostrarToast(titulo, detalle, tipo = 'success') {
+  const iconos = {
+    success: '✓',
+    error: '✗',
+    warning: '⚠',
+    info: 'ℹ'
+  };
+
+  const toast = document.createElement('div');
+  toast.className = `toast ${tipo}`;
+  
+  toast.innerHTML = `
+    <div class="toast-header">
+      <span class="toast-icon">${iconos[tipo]}</span>
+      <span>${titulo}</span>
+    </div>
+    <div class="toast-body">${detalle}</div>
+  `;
+  
+  document.body.appendChild(toast);
+  
+  setTimeout(() => {
+    toast.classList.add('hiding');
+    setTimeout(() => toast.remove(), 300);
+  }, 3000);
+}
+
+// === COMBINAR POLÍGONOS CON UNIÓN GEOMÉTRICA (solo DSUBICI) ===
+if(esUsuarioDSUBICI) {
+  document.getElementById('btnCombinarPoligonos').addEventListener('click', function() {
+    if(seleccionados.size < 2) {
+      mostrarToast('Atención', 'Debe seleccionar al menos 2 polígonos para combinar', 'warning');
+      return;
+    }
+    
+    const nombreNuevo = document.getElementById('nombreCombinado').value.trim();
+    if(!nombreNuevo) {
+      mostrarToast('Atención', 'Debe ingresar un nombre para el polígono combinado', 'warning');
+      return;
+    }
+    
+    const colorNuevo = document.getElementById('colorCombinado').value;
+    
+    // Mostrar información de los polígonos seleccionados
+    const nombresSeleccionados = [];
+    let superficieTotal = 0;
+    
+    seleccionados.forEach(idx => {
+      const fila = document.querySelector(`#tablaPoligonos tbody tr[data-index="${idx}"]`);
+      if(fila) {
+        const nombre = fila.querySelectorAll('input')[1].value;
+        const has = parseFloat(fila.querySelectorAll('input')[2].value) || 0;
+        nombresSeleccionados.push(nombre);
+        superficieTotal += has;
+      }
+    });
+    
+    const confirmMsg = `¿Confirma combinar estos ${seleccionados.size} polígonos?\n\n${nombresSeleccionados.join('\n')}\n\n➡️ En: "${nombreNuevo}"\n📏 Superficie total: ${superficieTotal.toFixed(2)} has\n\n⚠️ Los polígonos originales serán eliminados de la vista.`;
+    
+    if(!confirm(confirmMsg)) {
+      return;
+    }
+    
+    try {
+      const boton = document.getElementById('btnCombinarPoligonos');
+      boton.disabled = true;
+      boton.textContent = '⏳ COMBINANDO...';
+      
+      // Guardar el zoom y centro actual del mapa
+      const zoomActual = map.getZoom();
+      const centroActual = map.getCenter();
+      
+      // Recolectar todos los polígonos seleccionados y convertir a formato GeoJSON
+      const poligonosTurf = [];
+      const indicesAEliminar = Array.from(seleccionados).sort((a, b) => b - a);
+      
+      seleccionados.forEach(idx => {
+        if(leafletPoligonos[idx]) {
+          const coords = leafletPoligonos[idx].getLatLngs()[0];
+          
+          // Convertir coordenadas Leaflet [lat, lng] a GeoJSON [lng, lat]
+          const coordsGeoJSON = coords.map(latlng => [latlng.lng, latlng.lat]);
+          
+          // Cerrar el polígono si no está cerrado
+          if(coordsGeoJSON[0][0] !== coordsGeoJSON[coordsGeoJSON.length-1][0] || 
+             coordsGeoJSON[0][1] !== coordsGeoJSON[coordsGeoJSON.length-1][1]) {
+            coordsGeoJSON.push(coordsGeoJSON[0]);
+          }
+          
+          // Crear polígono Turf
+          const polygon = turf.polygon([coordsGeoJSON]);
+          poligonosTurf.push(polygon);
+        }
+      });
+      
+      // Combinar todos los polígonos usando unión geométrica
+      let poligonoCombinado = poligonosTurf[0];
+      
+      for(let i = 1; i < poligonosTurf.length; i++) {
+        try {
+          // Intentar unión geométrica
+          poligonoCombinado = turf.union(poligonoCombinado, poligonosTurf[i]);
+        } catch(e) {
+          console.warn('No se pudieron unir algunos polígonos, usando convex hull');
+          // Si falla la unión, usar convex hull de todos los puntos
+          const allPoints = [];
+          poligonosTurf.forEach(poly => {
+            const coords = turf.getCoords(poly)[0];
+            coords.forEach(coord => allPoints.push(coord));
+          });
+          const points = turf.points(allPoints);
+          poligonoCombinado = turf.convex(points);
+          break;
+        }
+      }
+      
+      // Si el resultado es null o inválido, usar convex hull
+      if(!poligonoCombinado) {
+        const allPoints = [];
+        poligonosTurf.forEach(poly => {
+          const coords = turf.getCoords(poly)[0];
+          coords.forEach(coord => allPoints.push(coord));
+        });
+        const points = turf.points(allPoints);
+        poligonoCombinado = turf.convex(points);
+      }
+      
+      // Extraer coordenadas del polígono combinado
+      let coordsFinales = turf.getCoords(poligonoCombinado);
+      
+      // Si es MultiPolygon, tomar todas las geometrías
+      if(poligonoCombinado.geometry.type === 'MultiPolygon') {
+        // Convertir MultiPolygon a array de polígonos
+        coordsFinales = coordsFinales;
+      } else {
+        // Es un solo Polygon
+        coordsFinales = [coordsFinales[0]];
+      }
+      
+      // Convertir de vuelta a formato Leaflet [lat, lng]
+      const coordsLeaflet = coordsFinales.map(polyCoords => {
+        return polyCoords.map(coord => [coord[1], coord[0]]); // [lng, lat] -> [lat, lng]
+      });
+      
+      // Crear el nuevo polígono combinado en el mapa
+      const nuevoPoly = L.polygon(coordsLeaflet, {
+        color: "#000000",
+        weight: 0.5,
+        fillColor: colorNuevo,
+        fillOpacity: 0.6
+      }).addTo(map);
+      
+      // Asignar índice al nuevo polígono
+      const nuevoIdx = leafletPoligonos.length;
+      nuevoPoly.index = nuevoIdx;
+      nuevoPoly.bindPopup("<b>" + nombreNuevo + "</b><br>" + superficieTotal.toFixed(2) + " has");
+      nuevoPoly.on('click', () => { 
+        toggleSeleccion(nuevoIdx); 
+        scrollFila(nuevoIdx);
+        
+        // Resaltar campo nombre SOLO para DSUBICI
+        if(esUsuarioDSUBICI) {
+          setTimeout(() => {
+            const fila = document.querySelector(`#tablaPoligonos tbody tr[data-index="${nuevoIdx}"]`);
+            if(fila) {
+              const inputNombre = fila.querySelectorAll('input')[1];
+              if(inputNombre) {
+                inputNombre.focus();
+                if(inputNombre.value && inputNombre.value.trim() !== '') {
+                  inputNombre.select();
+                } else {
+                  inputNombre.setSelectionRange(0, 0);
+                }
+                
+                const estiloOriginalBg = inputNombre.style.backgroundColor;
+                const estiloOriginalBorder = inputNombre.style.border;
+                
+                inputNombre.style.backgroundColor = '#fff3cd';
+                inputNombre.style.border = '2px solid #ffc107';
+                inputNombre.style.transition = 'all 0.2s ease';
+                
+                setTimeout(() => {
+                  inputNombre.style.backgroundColor = estiloOriginalBg;
+                  inputNombre.style.border = estiloOriginalBorder;
+                }, 500);
+              }
+            }
+          }, 100);
+        }
+      });
+      
+      // Agregar a la lista de polígonos de Leaflet
+      leafletPoligonos.push(nuevoPoly);
+      
+      // Eliminar los polígonos originales del mapa
+      indicesAEliminar.forEach(idx => {
+        if(leafletPoligonos[idx]) {
+          map.removeLayer(leafletPoligonos[idx]);
+          leafletPoligonos[idx] = null;
+        }
+      });
+      
+      // Agregar fila en la tabla para el nuevo polígono combinado
+      const tbody = document.querySelector('#tablaPoligonos tbody');
+      const nuevaFila = document.createElement('tr');
+      nuevaFila.setAttribute('data-index', nuevoIdx);
+      
+      // Obtener datos del primer polígono seleccionado para status, partido, etc.
+      const primeraFilaSeleccionada = document.querySelector(`#tablaPoligonos tbody tr[data-index="${Array.from(seleccionados)[0]}"]`);
+      const inputsPrimera = primeraFilaSeleccionada.querySelectorAll('input');
+      
+      nuevaFila.innerHTML = `
+        <td><input type="checkbox" class="selectFila"></td>
+        <td><input type="text" value="${nombreNuevo}"></td>
+        <td><input type="text" value="${superficieTotal.toFixed(2)}"></td>
+        <td><input type="text" value="${inputsPrimera[3].value}"></td>
+        <td><input type="text" value="${inputsPrimera[4].value}"></td>
+        <td><input type="text" value="${inputsPrimera[5].value}"></td>
+        <td><input type="text" value="${inputsPrimera[6].value}"></td>
+        <td><input type="text" value="${inputsPrimera[7].value}"></td>
+        <td><input type="color" value="${colorNuevo}" class="colorInput"></td>
+      `;
+      
+      tbody.appendChild(nuevaFila);
+      
+      // Eliminar filas originales de la tabla (en orden inverso)
+      indicesAEliminar.forEach(idx => {
+        const fila = document.querySelector(`#tablaPoligonos tbody tr[data-index="${idx}"]`);
+        if(fila) {
+          fila.remove();
+        }
+      });
+      
+      // Limpiar selección
+      seleccionados.clear();
+      
+      // Restaurar el zoom y centro del mapa (MANTENER COMO ESTABA)
+      map.setView(centroActual, zoomActual);
+      
+      // Limpiar campos de entrada
+      document.getElementById('nombreCombinado').value = '';
+      document.getElementById('colorCombinado').value = '#FF6B00';
+      
+      boton.disabled = false;
+      boton.textContent = '🔗 COMBINAR Y ELIMINAR ORIGINALES';
+      
+      const tipoResultado = poligonoCombinado.geometry.type === 'MultiPolygon' ? 
+        'polígonos separados' : 'polígono único';
+      
+      mostrarToast(
+        '✅ Polígonos combinados', 
+        `${poligonosTurf.length} polígonos → "${nombreNuevo}" (${superficieTotal.toFixed(2)} has) - ${tipoResultado}`, 
+        'success'
+      );
+      
+      // Regenerar filtro de colores
+      setTimeout(() => regenerarFiltroColores(), 200);
+      
+    } catch(error) {
+      console.error('Error al combinar:', error);
+      mostrarToast('Error', 'No se pudo combinar los polígonos: ' + error.message, 'error');
+      const boton = document.getElementById('btnCombinarPoligonos');
+      boton.disabled = false;
+      boton.textContent = '🔗 COMBINAR Y ELIMINAR ORIGINALES';
+    }
+  });
+}
+
+// === FILTRO DINÁMICO POR COLOR ===
+function generarFiltroColores() {
+  const coloresUnicos = new Map();
+  
+  poligonos.forEach((p) => {
+    const color = (p.color || '#CCCCCC').toUpperCase();
+    if (!coloresUnicos.has(color)) {
+      const cantidad = poligonos.filter(pol => (pol.color || '#CCCCCC').toUpperCase() === color).length;
+      coloresUnicos.set(color, cantidad);
+    }
+  });
+  
+  const coloresOrdenados = Array.from(coloresUnicos.entries())
+    .sort((a, b) => b[1] - a[1]);
+  
+  const select = document.getElementById('filtroColor');
+  
+  coloresOrdenados.forEach(([color, cantidad]) => {
+    const option = document.createElement('option');
+    option.value = color;
+    
+    const cuadrado = '■';
+    const nombreColor = obtenerNombreColor(color);
+    option.textContent = `${cuadrado} ${nombreColor} (${cantidad})`;
+    
+    option.style.backgroundColor = color;
+    option.style.color = esColorClaro(color) ? '#000000' : '#FFFFFF';
+    option.style.fontWeight = 'bold';
+    
+    select.appendChild(option);
+  });
+  
+  console.log(`✅ Filtro de colores generado: ${coloresOrdenados.length} colores únicos`);
+}
+
+// === REGENERAR FILTRO DINÁMICO EN TIEMPO REAL ===
+function regenerarFiltroColores() {
+  const selectColor = document.getElementById('filtroColor');
+  const valorActual = selectColor.value;
+  
+  selectColor.innerHTML = '<option value="">Color</option>';
+  
+  const coloresUnicos = new Map();
+  
+  document.querySelectorAll('#tablaPoligonos tbody tr').forEach(tr => {
+    const colorInput = tr.querySelector('input.colorInput');
+    if(colorInput) {
+      const color = colorInput.value.toUpperCase();
+      if(!coloresUnicos.has(color)) {
+        coloresUnicos.set(color, 0);
+      }
+      coloresUnicos.set(color, coloresUnicos.get(color) + 1);
+    }
+  });
+  
+  const coloresOrdenados = Array.from(coloresUnicos.entries())
+    .sort((a, b) => b[1] - a[1]);
+  
+  coloresOrdenados.forEach(([color, cantidad]) => {
+    const option = document.createElement('option');
+    option.value = color;
+    
+    const cuadrado = '■';
+    const nombreColor = obtenerNombreColor(color);
+    option.textContent = `${cuadrado} ${nombreColor} (${cantidad})`;
+    
+    option.style.backgroundColor = color;
+    option.style.color = esColorClaro(color) ? '#000000' : '#FFFFFF';
+    option.style.fontWeight = 'bold';
+    
+    selectColor.appendChild(option);
+  });
+  
+  if(valorActual && Array.from(selectColor.options).some(opt => opt.value === valorActual)) {
+    selectColor.value = valorActual;
+  }
+  
+  console.log(`🔄 Filtro actualizado: ${coloresOrdenados.length} colores detectados en la tabla`);
+}
+
+function obtenerNombreColor(hex) {
+  const coloresNombres = {
+    '#FF0000': 'ROJO',
+    '#00FF00': 'VERDE',
+    '#0000FF': 'AZUL',
+    '#FFFF00': 'AMARILLO',
+    '#FFA500': 'NARANJA',
+    '#800080': 'MORADO',
+    '#00FFFF': 'CYAN',
+    '#FF00FF': 'MAGENTA',
+    '#808080': 'GRIS',
+    '#000000': 'NEGRO',
+    '#FFFFFF': 'BLANCO',
+    '#B5EAD7': 'VERDE MENTA',
+    '#FFDAC1': 'DURAZNO',
+    '#CBAACB': 'LAVANDA',
+    '#E2F0CB': 'VERDE CLARO',
+    '#CCCCCC': 'GRIS CLARO',
+    '#FF6B00': 'NARANJA INTENSO'
+  };
+  
+  return coloresNombres[hex.toUpperCase()] || hex;
+}
+
+function esColorClaro(hex) {
+  const rgb = parseInt(hex.slice(1), 16);
+  const r = (rgb >> 16) & 0xff;
+  const g = (rgb >>  8) & 0xff;
+  const b = (rgb >>  0) & 0xff;
+  const luminancia = 0.299 * r + 0.587 * g + 0.114 * b;
+  return luminancia > 128;
+}
+
+generarFiltroColores();
+
+document.querySelector('#tablaPoligonos tbody').addEventListener('change', function(e) {
+  if(e.target.classList.contains('colorInput')) {
+    setTimeout(() => regenerarFiltroColores(), 100);
+  }
+});
+
+// === SISTEMA DE FILTROS UNIFICADO ===
+document.getElementById('filtroColor').addEventListener('click', function() {
+  regenerarFiltroColores();
+});
+
+document.getElementById('filtroColor').addEventListener('change', function() {
+  aplicarFiltros();
+});
+
+document.querySelectorAll('#filtros input').forEach(input => {
+  input.addEventListener('keyup', aplicarFiltros);
+});
+
+function aplicarFiltros() {
+  const filtros = {};
+  
+  document.querySelectorAll('#filtros input').forEach(inp => {
+    const col = parseInt(inp.getAttribute('data-col'));
+    const val = inp.value.toUpperCase().trim();
+    if(val) filtros[col] = val;
+  });
+  
+  const filtroColor = document.getElementById('filtroColor').value;
+  if(filtroColor) filtros[8] = filtroColor;
+  
+  let visibles = 0;
+  document.querySelectorAll('#tablaPoligonos tbody tr').forEach(row => {
+    let mostrar = true;
+    
+    Object.keys(filtros).forEach(col => {
+      if(col == 8) return;
+      
+      const cellVal = row.querySelectorAll('input')[col].value.toUpperCase();
+      if(!cellVal.includes(filtros[col])) mostrar = false;
+    });
+    
+    if(filtroColor && mostrar) {
+      const colorInput = row.querySelector('input.colorInput');
+      if(colorInput.value.toUpperCase() !== filtroColor.toUpperCase()) {
+        mostrar = false;
+      }
+    }
+    
+    row.style.display = mostrar ? '' : 'none';
+    if(mostrar) visibles++;
+  });
+  
+  const totalFiltros = Object.keys(filtros).length;
+  if(totalFiltros > 0) {
+    const totalRegistros = document.querySelectorAll('#tablaPoligonos tbody tr').length;
+    mostrarToast('Filtro aplicado', `${visibles} de ${totalRegistros} registros visibles`, 'info');
+  }
+}
+
+// === ORDENAMIENTO OPTIMIZADO PARA TABLAS GRANDES ===
+let lastSortCol = null;
+let sortAsc = true;
+let ordenandoEnProgreso = false;
+
+document.querySelectorAll('th.sortable').forEach(th => {
+    th.addEventListener('click', function() {
+        if(seleccionados.size === 0) {
+            mostrarToast('Atención', 'Debe seleccionar al menos un registro para ordenar', 'warning');
+            return;
+        }
+        
+        if(ordenandoEnProgreso) {
+            mostrarToast('Procesando', 'Ya hay un ordenamiento en progreso', 'warning');
+            return;
+        }
+        
+        if(seleccionados.size > 1000) {
+            mostrarToast(
+                '⚠️ Selección grande', 
+                `Has seleccionado ${seleccionados.size} registros. Esto puede tardar unos segundos...`,
+                'warning'
+            );
+        }
+        
+        const colIdx = parseInt(this.getAttribute('data-col'));
+        
+        if(lastSortCol === colIdx) {
+            sortAsc = !sortAsc;
+        } else {
+            sortAsc = true;
+            lastSortCol = colIdx;
+        }
+        
+        document.querySelectorAll('th.sortable').forEach(h => h.classList.remove('asc', 'desc'));
+        this.classList.add(sortAsc ? 'asc' : 'desc');
+        
+        sortSelectedOptimized(colIdx, sortAsc);
+    });
+});
+
+function sortSelectedOptimized(colIdx, ascending) {
+    ordenandoEnProgreso = true;
+    const tbody = document.querySelector('#tablaPoligonos tbody');
+    
+    mostrarToast('Ordenando...', `Procesando ${seleccionados.size} registros`, 'info');
+    tbody.style.pointerEvents = 'none';
+    
+    setTimeout(() => {
+        try {
+            const startTime = performance.now();
+            
+            const selected = [];
+            seleccionados.forEach(idx => {
+                const row = tbody.querySelector(`tr[data-index="${idx}"]`);
+                if(row) {
+                    const val = row.querySelectorAll('input')[colIdx].value;
+                    selected.push({
+                        row: row,
+                        val: colIdx === 2 ? parseFloat(val) || 0 : val.toUpperCase(),
+                        idx: idx
+                    });
+                }
+            });
+            
+            selected.sort((a, b) => {
+                if(typeof a.val === 'number') {
+                    return ascending ? a.val - b.val : b.val - a.val;
+                }
+                return ascending ? a.val.localeCompare(b.val) : b.val.localeCompare(a.val);
+            });
+            
+            const allRows = Array.from(tbody.children);
+            const firstPos = allRows.indexOf(selected[0].row);
+            const fragment = document.createDocumentFragment();
+            
+            selected.forEach(item => item.row.remove());
+            selected.forEach(item => fragment.appendChild(item.row));
+            
+            const remainingRows = Array.from(tbody.children);
+            
+            if(firstPos === 0 || remainingRows.length === 0) {
+                tbody.insertBefore(fragment, tbody.firstChild);
+            } else if(firstPos >= remainingRows.length) {
+                tbody.appendChild(fragment);
+            } else {
+                const referenceNode = remainingRows[Math.min(firstPos, remainingRows.length - 1)];
+                tbody.insertBefore(fragment, referenceNode);
+            }
+            
+            requestAnimationFrame(() => {
+                seleccionados.forEach(idx => {
+                    const row = tbody.querySelector(`tr[data-index="${idx}"]`);
+                    if(row) {
+                        row.classList.add('seleccionado');
+                        row.querySelector('.selectFila').checked = true;
+                        if(leafletPoligonos[idx]) leafletPoligonos[idx].setStyle({weight:2});
+                    }
+                });
+                
+                tbody.style.pointerEvents = '';
+                ordenandoEnProgreso = false;
+                
+                const endTime = performance.now();
+                const tiempo = ((endTime - startTime) / 1000).toFixed(2);
+                
+                mostrarToast(
+                    '✅ Ordenamiento completado',
+                    `${selected.length} registros en ${tiempo}s ${ascending ? '▲' : '▼'}`,
+                    'success'
+                );
+            });
+            
+        } catch(error) {
+            console.error('Error al ordenar:', error);
+            tbody.style.pointerEvents = '';
+            ordenandoEnProgreso = false;
+            
+            mostrarToast(
+                'Error',
+                'No se pudo completar el ordenamiento. Intenta con menos registros.',
+                'error'
+            );
+        }
+    }, 50);
+}
+
+function getFilaIndex(row) {
+  return parseInt(row.getAttribute('data-index'));
+}
+
+function toggleSeleccion(idx){
+  const fila = document.querySelector(`#tablaPoligonos tbody tr[data-index="${idx}"]`);
+  const checkbox = fila.querySelector('input.selectFila');
+  
+  if(seleccionados.has(idx)){
+    seleccionados.delete(idx);
+    fila.classList.remove('seleccionado');
+    checkbox.checked = false;
+    if(leafletPoligonos[idx]) leafletPoligonos[idx].setStyle({weight:0.5});
+  } else {
+    seleccionados.add(idx);
+    fila.classList.add('seleccionado');
+    checkbox.checked = true;
+    if(leafletPoligonos[idx]) leafletPoligonos[idx].setStyle({weight:2});
+  }
+}
+
+function scrollFila(idx){
+  const fila = document.querySelector(`#tablaPoligonos tbody tr[data-index="${idx}"]`);
+  if(fila) fila.scrollIntoView({behavior:"smooth", block:"center"});
+}
+
+document.querySelector('#tablaPoligonos tbody').addEventListener('click', function(e){
+  if(e.target.tagName === 'INPUT') return;
+  const tr = e.target.closest('tr');
+  if(tr) {
+    const idx = getFilaIndex(tr);
+    toggleSeleccion(idx);
+    scrollFila(idx);
+  }
+});
+
+document.querySelector('#tablaPoligonos tbody').addEventListener('change', function(e){
+  if(e.target.classList.contains('selectFila')) {
+    const idx = getFilaIndex(e.target.closest('tr'));
+    toggleSeleccion(idx);
+  }
+});
+
+document.getElementById('aplicarColor').addEventListener('click', ()=>{
+  const color = document.getElementById('colorBloque').value;
+  if(!color) {
+    mostrarToast('Atención', 'Debe seleccionar un color primero', 'warning');
+    return;
+  }
+  
+  let count = 0;
+  seleccionados.forEach(idx=>{
+    const fila = document.querySelector(`#tablaPoligonos tbody tr[data-index="${idx}"]`);
+    fila.querySelector('input.colorInput').value = color;
+    if(leafletPoligonos[idx]) leafletPoligonos[idx].setStyle({fillColor:color});
+    count++;
+  });
+  
+  mostrarToast('Color aplicado', `Color aplicado a ${count} registros`, 'success');
+  
+  regenerarFiltroColores();
+});
+
+document.getElementById('seleccionarFiltrados').addEventListener('click', ()=>{
+  const filasVisibles = document.querySelectorAll('#tablaPoligonos tbody tr:not([style*="display: none"])');
+  
+  if(filasVisibles.length > 2000) {
+    if(!confirm(`⚠️ Vas a seleccionar ${filasVisibles.length} registros.\n\nEsto puede hacer que el ordenamiento sea lento.\n\n¿Continuar?`)) {
+      return;
+    }
+  }
+  
+  let count = 0;
+  filasVisibles.forEach(tr => {
+    const idx = getFilaIndex(tr);
+    if(!seleccionados.has(idx)) {
+      toggleSeleccion(idx);
+      count++;
+    }
+  });
+  
+  mostrarToast('Selección completada', `${count} registros seleccionados`, 'info');
+});
+
+document.getElementById('deseleccionarTodos').addEventListener('click', ()=>{ 
+  const count = seleccionados.size;
+  Array.from(seleccionados).forEach(idx=> toggleSeleccion(idx));
+  mostrarToast('Deselección completada', `${count} registros deseleccionados`, 'info');
+});
+
+document.getElementById('editarColumnas').addEventListener('click', function(){
+  if(seleccionados.size === 0){
+    mostrarToast('Atención', 'Debe seleccionar al menos un registro para editar', 'warning');
+    return;
+  }
+
+  const valores = {
+    1: document.getElementById('edit-nombre').value.trim(),
+    2: document.getElementById('edit-has').value.trim(),
+    3: document.getElementById('edit-status').value.trim(),
+    4: document.getElementById('edit-status1').value.trim(),
+    5: document.getElementById('edit-status2').value.trim(),
+    6: document.getElementById('edit-status3').value.trim(),
+    7: document.getElementById('edit-partido').value.trim()
+  };
+
+  let cambios = 0;
+  seleccionados.forEach(idx => {
+    const fila = document.querySelector(`#tablaPoligonos tbody tr[data-index="${idx}"]`);
+    const inputs = fila.querySelectorAll('input');
+    
+    Object.keys(valores).forEach(col => {
+      if(valores[col] !== '') {
+        inputs[col].value = valores[col];
+        cambios++;
+      }
+    });
+  });
+
+  document.querySelectorAll('#edicion-masiva input').forEach(inp => inp.value = '');
+  
+  if(cambios > 0) {
+    mostrarToast('Edición completada', `${cambios} cambios realizados en ${seleccionados.size} registros`, 'success');
+  } else {
+    mostrarToast('Sin cambios', 'No se ingresaron valores para editar', 'info');
+  }
+});
+
+const tabla = document.getElementById("tabla-container");
+const header = document.getElementById("tabla-header");
+let offsetX, offsetY, dragging=false;
+header.addEventListener("mousedown",(e)=>{ dragging=true; offsetX=e.clientX-tabla.offsetLeft; offsetY=e.clientY-tabla.offsetTop; });
+document.addEventListener("mouseup",()=>dragging=false);
+document.addEventListener("mousemove",(e)=>{ if(!dragging) return; tabla.style.left=(e.clientX-offsetX)+"px"; tabla.style.top=(e.clientY-offsetY)+"px"; });
+
+document.getElementById('btn-grabar').addEventListener('click',()=>{ 
+  document.getElementById('menu-grabar').style.display = 
+    document.getElementById('menu-grabar').style.display === 'block' ? 'none' : 'block';
+});
+
+document.addEventListener('click',function(e){
+  if(!e.target.closest('#btn-grabar') && !e.target.closest('#menu-grabar')){ 
+    document.getElementById('menu-grabar').style.display = 'none';
+  }
+});
+
+function obtenerDatos(){
+  const filas = [];
+  document.querySelectorAll('#tablaPoligonos tbody tr').forEach(tr => {
+    const idx = getFilaIndex(tr);
+    const inputs = tr.querySelectorAll('input');
+    let coords = '';
+    if(leafletPoligonos[idx]){
+      coords = leafletPoligonos[idx].getLatLngs()[0].map(p => `${p.lng},${p.lat}`).join(" ");
+    }
+    filas.push({
+      name: inputs[1].value,
+      superficie: inputs[2].value,
+      status: inputs[3].value,
+      status1: inputs[4].value,
+      status2: inputs[5].value,
+      status3: inputs[6].value,
+      partido: inputs[7].value,
+      color: inputs[8].value,
+      colorOriginal: inputs[8].value,
+      COORDENADAS: coords
+    });
+  });
+  return filas;
+}
+
+document.getElementById('opcion-grabar').addEventListener('click',()=>{
+  fetch('/guardar', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({datos: obtenerDatos()})
+  })
+  .then(r=>r.json())
+  .then(resp => {
+    if(resp.success) {
+      mostrarToast(resp.mensaje, resp.detalle || 'Operación completada', resp.tipo || 'success');
+    } else {
+      mostrarToast(resp.mensaje || 'Error', resp.detalle || 'No se pudo completar la operación', 'error');
+    }
+  })
+  .catch(err => {
+    mostrarToast('Error de conexión', 'No se pudo guardar el archivo', 'error');
+  });
+  
+  document.getElementById('menu-grabar').style.display = 'none';
+});
+
+document.getElementById('opcion-grabar-como').addEventListener('click', async ()=>{
+  const fecha = new Date();
+  const dd = String(fecha.getDate()).padStart(2,'0');
+  const mm = String(fecha.getMonth()+1).padStart(2,'0');
+  const aa = String(fecha.getFullYear()).slice(-2);
+  const hh = String(fecha.getHours()).padStart(2,'0');
+  const min = String(fecha.getMinutes()).padStart(2,'0');
+  const sugerido = `poligonos_${dd}-${mm}-${aa}_${hh}-${min}.xlsx`;
+
+  let nuevoNombre = prompt("Nombre del archivo:", sugerido);
+  if(!nuevoNombre) { 
+    document.getElementById('menu-grabar').style.display = 'none'; 
+    return; 
+  }
+  if(!nuevoNombre.endsWith('.xlsx')) nuevoNombre += '.xlsx';
+
+  try {
+    const resp = await fetch('/guardar_como', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({datos: obtenerDatos(), nuevo_nombre: nuevoNombre})
+    });
+    const json = await resp.json();
+    
+    if(json.success) {
+      mostrarToast(json.mensaje, json.detalle || 'Archivo guardado', json.tipo || 'success');
+    } else {
+      mostrarToast(json.mensaje || 'Error', json.detalle || 'No se pudo guardar', 'error');
+    }
+  } catch (err) { 
+    mostrarToast('Error de conexión', 'No se pudo guardar el archivo', 'error');
+  }
+  document.getElementById('menu-grabar').style.display = 'none';
+});
+
+document.getElementById('exportarPDF').addEventListener('click',()=>{
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  const filasPDF = [];
+  seleccionados.forEach(idx=>{
+    const fila = document.querySelector(`#tablaPoligonos tbody tr[data-index="${idx}"]`);
+    const inputs = fila.querySelectorAll('input');
+    filasPDF.push([
+      inputs[0].checked ? 'X' : '',
+      inputs[1].value,
+      inputs[2].value,
+      inputs[3].value,
+      inputs[4].value,
+      inputs[5].value,
+      inputs[6].value,
+      inputs[7].value,
+      inputs[8].value
+    ]);
+  });
+  
+  if(filasPDF.length===0){ 
+    mostrarToast('Atención', 'Debe seleccionar registros para exportar', 'warning');
+    return; 
+  }
+  
+  doc.autoTable({
+    head: [['Sel','Nombre','Has','Status','Status1','Status2','Status3','Ptdo','Color']],
+    body: filasPDF,
+    theme: 'grid',
+    styles: {fontSize:8},
+    margin: {top:10}
+  });
+  doc.save('poligonos.pdf');
+  
+  mostrarToast('PDF exportado', `${filasPDF.length} registros exportados correctamente`, 'success');
+});
+
+document.getElementById("btnLimpiar").addEventListener("click", function() {
+    document.querySelectorAll("#filtros input").forEach(input => input.value = "");
+    document.getElementById("filtroColor").value = "";
+    document.querySelectorAll("#edicion-masiva input").forEach(input => input.value = "");
+    document.querySelectorAll("#tablaPoligonos tbody tr").forEach(tr => tr.style.display = '');
+    document.getElementById("colorBloque").value = "";
+    
+    if(esUsuarioDSUBICI) {
+      document.getElementById("nombreCombinado").value = "";
+      document.getElementById("colorCombinado").value = "#FF6B00";
+    }
+    
+    mostrarToast('Limpieza completada', 'Filtros y campos de edición limpiados', 'info');
+});
+
+</script>
+</body>
+</html>
