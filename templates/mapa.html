@@ -537,6 +537,100 @@ const esUsuarioDSUBICI = "{{ usuario }}" === "DSUBICI";
 const map = L.map('map').setView([-35, -63], 8);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{ attribution:'&copy; OpenStreetMap' }).addTo(map);
 
+// === GEOLOCALIZACIÓN GPS (Solo punto azul) ===
+let marcadorGPS = null;
+let watchId = null;
+let gpsActivo = false;
+
+const iconoGPS = L.divIcon({
+  className: 'gps-marker',
+  html: '<div style="background: #4285F4; width: 16px; height: 16px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 10px rgba(0,0,0,0.5);"></div>',
+  iconSize: [16, 16],
+  iconAnchor: [8, 8]
+});
+
+function activarGPS() {
+  if(!navigator.geolocation) {
+    mostrarToast('GPS no disponible', 'Tu dispositivo no soporta geolocalización', 'error');
+    return;
+  }
+  
+  if(gpsActivo) {
+    if(watchId) {
+      navigator.geolocation.clearWatch(watchId);
+      watchId = null;
+    }
+    if(marcadorGPS) {
+      map.removeLayer(marcadorGPS);
+      marcadorGPS = null;
+    }
+    gpsActivo = false;
+    document.getElementById('btnGPS').innerHTML = '📍 GPS';
+    document.getElementById('btnGPS').style.backgroundColor = '#0056b3';
+    return;
+  }
+  
+  const opciones = {
+    enableHighAccuracy: true,
+    timeout: 10000,
+    maximumAge: 0
+  };
+  
+  navigator.geolocation.getCurrentPosition(
+    (position) => {
+      const lat = position.coords.latitude;
+      const lng = position.coords.longitude;
+      
+      if(marcadorGPS) {
+        marcadorGPS.setLatLng([lat, lng]);
+      } else {
+        marcadorGPS = L.marker([lat, lng], {icon: iconoGPS}).addTo(map);
+      }
+      
+      map.setView([lat, lng], 15);
+      
+      gpsActivo = true;
+      document.getElementById('btnGPS').innerHTML = '📍 GPS ON';
+      document.getElementById('btnGPS').style.backgroundColor = '#28a745';
+      
+      watchId = navigator.geolocation.watchPosition(
+        (pos) => {
+          if(marcadorGPS) {
+            marcadorGPS.setLatLng([pos.coords.latitude, pos.coords.longitude]);
+          }
+        },
+        (error) => {
+          console.error('Error de GPS:', error);
+        },
+        opciones
+      );
+    },
+    (error) => {
+      let mensaje = 'No se pudo obtener la ubicación';
+      switch(error.code) {
+        case error.PERMISSION_DENIED:
+          mensaje = 'Permiso de ubicación denegado';
+          break;
+        case error.POSITION_UNAVAILABLE:
+          mensaje = 'Ubicación no disponible';
+          break;
+        case error.TIMEOUT:
+          mensaje = 'Tiempo de espera agotado';
+          break;
+      }
+      mostrarToast('Error GPS', mensaje, 'error');
+    },
+    opciones
+  );
+}
+
+const botonGPS = document.createElement('button');
+botonGPS.id = 'btnGPS';
+botonGPS.innerHTML = '📍 GPS';
+botonGPS.style.cssText = 'position: fixed; bottom: 20px; left: 20px; z-index: 1001; background-color: #0056b3; color: white; border: none; padding: 12px 20px; border-radius: 25px; cursor: pointer; font-size: 14px; font-weight: bold; box-shadow: 0 4px 8px rgba(0,0,0,0.3);';
+botonGPS.addEventListener('click', activarGPS);
+document.body.appendChild(botonGPS);
+
 poligonos.forEach((p, idx)=>{
   if(p.coords && p.coords.length>0){
     const poly = L.polygon(p.coords,{color:"#000000",weight:0.5,fillColor:p.color,fillOpacity:0.6})
