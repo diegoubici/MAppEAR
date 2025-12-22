@@ -891,52 +891,68 @@ poligonos.forEach((p, idx)=>{
     
     // === EFECTO HOVER: Resaltar al pasar el mouse ===
     poly.on('mouseover', function(e) {
-      const layer = e.target;
-      
-      // No mostrar tooltip si se acaba de hacer click
-      if(clickReciente) {
-        return;
-      }
-      
-      // Solo resaltar si NO está seleccionado
-      if(!seleccionados.has(idx)) {
-        // Aumentar grosor del borde (igual que selección)
-        layer.setStyle({
-          weight: 2,           // Mismo grosor que selección
-          color: '#000000'     // Mismo color que selección
-        });
+      try {
+        const layer = e.target;
         
-        // Traer al frente
-        layer.bringToFront();
+        console.log(`Hover sobre polígono ${idx}: ${p.name}`);
+        
+        // No mostrar tooltip si se acaba de hacer click
+        if(clickReciente) {
+          console.log('Click reciente, no mostrar tooltip');
+          return;
+        }
+        
+        // Solo resaltar si NO está seleccionado
+        if(!seleccionados.has(idx)) {
+          // Aumentar grosor del borde (igual que selección)
+          layer.setStyle({
+            weight: 2,           // Mismo grosor que selección
+            color: '#000000'     // Mismo color que selección
+          });
+          
+          // Traer al frente
+          layer.bringToFront();
+        }
+        
+        // Mostrar tooltip SIEMPRE (seleccionado o no)
+        const tooltipContent = `<strong>${p.name}</strong><br>${p.superficie} has`;
+        layer.bindTooltip(tooltipContent, {
+          permanent: false,
+          direction: 'top',
+          className: 'tooltip-poligono',
+          opacity: 0.95,
+          offset: [0, -10]
+        }).openTooltip();
+        
+        console.log('Tooltip mostrado correctamente');
+        
+      } catch(error) {
+        console.error('Error en hover:', error);
       }
-      
-      // Mostrar tooltip SIEMPRE (seleccionado o no)
-      const tooltipContent = `<strong>${p.name}</strong><br>${p.superficie} has`;
-      layer.bindTooltip(tooltipContent, {
-        permanent: false,
-        direction: 'top',
-        className: 'tooltip-poligono',
-        opacity: 0.95,
-        offset: [0, -10]
-      }).openTooltip();
     });
     
     poly.on('mouseout', function(e) {
-      const layer = e.target;
-      // Solo restaurar si NO está seleccionado
-      if(!seleccionados.has(idx)) {
-        layer.setStyle({
-          weight: 0.5,         // Grosor normal
-          color: '#000000'     // Negro normal
-        });
+      try {
+        const layer = e.target;
+        // Solo restaurar si NO está seleccionado
+        if(!seleccionados.has(idx)) {
+          layer.setStyle({
+            weight: 0.5,         // Grosor normal
+            color: '#000000'     // Negro normal
+          });
+        }
+        
+        // Cerrar tooltip (siempre)
+        layer.closeTooltip();
+        
+      } catch(error) {
+        console.error('Error en mouseout:', error);
       }
-      
-      // Cerrar tooltip (siempre)
-      layer.closeTooltip();
     });
     
     poly.on('click',(e)=>{ 
-      const layer = e.target;
+      try {
+        const layer = e.target;
       
       // Cerrar tooltip al hacer click
       layer.closeTooltip();
@@ -980,6 +996,10 @@ poligonos.forEach((p, idx)=>{
             }
           }
         }, 100);
+      }
+      
+      } catch(error) {
+        console.error('Error en click:', error);
       }
     });
     leafletPoligonos.push(poly);
