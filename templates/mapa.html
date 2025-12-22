@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <title>Mapa de Polígonos</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css">
 <style>
 body { font-family: Arial, sans-serif; margin:0; padding:0; overflow:hidden; }
 header { background-color: #0056b3; color: white; padding: 10px; height:50px; }
@@ -387,7 +388,88 @@ tr.seleccionado { background-color:#FFFF99 !important; }
   font-weight: bold;
 }
 
+/* === BOTONES DE DIBUJO Y ELIMINACIÓN (solo DSUBICI) === */
+#botonesMapaDSUBICI {
+  position: fixed;
+  top: 70px;
+  left: 20px;
+  z-index: 1001;
+  display: none;
+}
+
+#botonesMapaDSUBICI button {
+  display: block;
+  margin-bottom: 10px;
+  background-color: #ff6b00;
+  color: white;
+  border: none;
+  padding: 10px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: bold;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+  width: 180px;
+}
+
+#botonesMapaDSUBICI button:hover {
+  background-color: #e55b00;
+}
+
+#btnEliminarSeleccionados {
+  background-color: #dc3545;
+}
+
+#btnEliminarSeleccionados:hover {
+  background-color: #c82333;
+}
+
+#btnCancelarDibujo {
+  background-color: #6c757d;
+  display: none;
+}
+
+#btnCancelarDibujo:hover {
+  background-color: #5a6268;
+}
+
+#btnGuardarPoligono {
+  background-color: #28a745;
+  display: none;
+}
+
+#btnGuardarPoligono:hover {
+  background-color: #218838;
+}
+
+/* === TOOLTIP HOVER DE POLÍGONOS === */
+.tooltip-poligono {
+  background-color: rgba(255, 255, 255, 0.95) !important;  /* Fondo blanco casi transparente */
+  border: 1.5px solid #FF0000 !important;                  /* Borde rojo 1.5px */
+  color: #000000 !important;                               /* Letras negras */
+  font-weight: bold !important;
+  font-size: 14px !important;
+  padding: 8px 12px !important;
+  border-radius: 6px !important;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.3) !important;
+  white-space: nowrap !important;
+  z-index: 10000 !important;
+  text-transform: uppercase !important;                    /* Texto siempre en MAYÚSCULAS */
+  font-family: Arial, sans-serif !important;               /* Fuente de imprenta */
+}
+
+.tooltip-poligono::before {
+  border-top-color: #FF0000 !important;  /* Flecha roja */
+}
+
+
 </style>
+
+<!-- Scripts para soporte de capas TIFF/GeoTIFF -->
+<script src="https://unpkg.com/geotiff@2.0.7/dist-browser/geotiff.js"></script>
+<script src="https://unpkg.com/georaster@1.5.6/dist/georaster.min.js"></script>
+<script src="https://unpkg.com/georaster-layer-for-leaflet@3.9.0/dist/georaster-layer-for-leaflet.min.js"></script>
+
 </head>
 <body>
 
@@ -398,25 +480,54 @@ tr.seleccionado { background-color:#FFFF99 !important; }
 
 <div id="map"></div>
 
+<!-- Botones de dibujo y eliminación (solo DSUBICI) -->
+<div id="botonesMapaDSUBICI">
+  <button id="btnDibujarPoligono">✏️ DIBUJAR POLÍGONO</button>
+  <button id="btnGuardarPoligono">💾 GUARDAR POLÍGONO</button>
+  <button id="btnCancelarDibujo">❌ CANCELAR DIBUJO</button>
+  <button id="btnEliminarSeleccionados">🗑️ ELIMINAR SELECCIONADOS</button>
+</div>
+
 <div id="tabla-container">
   <div id="tabla-header">FILTRAR ATRIBUTOS</div>
 
   <div id="tabla-body">
     <div id="botonera">
-      <label>Color en bloque:</label>
       <select id="colorBloque">
         <option value="">-- ELEGIR COLOR --</option>
+        <option value="transparent">⬜ TRANSPARENTE (solo borde)</option>
         {% for c in [
-            {"nombre":"ROJO","codigo":"#FF0000"},{"nombre":"VERDE","codigo":"#00FF00"},{"nombre":"AZUL","codigo":"#0000FF"},
-            {"nombre":"VERDE MENTA","codigo":"#B5EAD7"},{"nombre":"DURAZNO SUAVE","codigo":"#FFDAC1"},{"nombre":"LAVANDA","codigo":"#CBAACB"},
-            {"nombre":"VERDE CLARO","codigo":"#E2F0CB"},{"nombre":"AMARILLO","codigo":"#FFFF00"},{"nombre":"NARANJA","codigo":"#FFA500"},
-            {"nombre":"MORADO","codigo":"#800080"},{"nombre":"CYAN","codigo":"#00FFFF"},{"nombre":"MAGENTA","codigo":"#FF00FF"},
-            {"nombre":"GRIS","codigo":"#808080"},{"nombre":"NEGRO","codigo":"#000000"},{"nombre":"BLANCO","codigo":"#FFFFFF"}
+            {"nombre":"CORAL VIVO","codigo":"#FF6B6B"},
+            {"nombre":"TURQUESA TROPICAL","codigo":"#4ECDC4"},
+            {"nombre":"LIMA ELÉCTRICO","codigo":"#C0F542"},
+            {"nombre":"VIOLETA NEÓN","codigo":"#9D4EDD"},
+            {"nombre":"MELOCOTÓN SUNRISE","codigo":"#FFB347"},
+            {"nombre":"ROSA FUCSIA","codigo":"#FF006E"},
+            {"nombre":"AZUL ELÉCTRICO","codigo":"#1E90FF"},
+            {"nombre":"VERDE ESMERALDA","codigo":"#50C878"},
+            {"nombre":"DORADO SUNSET","codigo":"#FFD700"},
+            {"nombre":"LAVANDA PASTEL","codigo":"#E6B0FF"},
+            {"nombre":"ROJO","codigo":"#FF0000"},
+            {"nombre":"VERDE","codigo":"#00FF00"},
+            {"nombre":"AZUL","codigo":"#0000FF"},
+            {"nombre":"AMARILLO","codigo":"#FFFF00"},
+            {"nombre":"NARANJA","codigo":"#FFA500"},
+            {"nombre":"MORADO","codigo":"#800080"},
+            {"nombre":"CYAN","codigo":"#00FFFF"},
+            {"nombre":"MAGENTA","codigo":"#FF00FF"},
+            {"nombre":"GRIS","codigo":"#808080"},
+            {"nombre":"NEGRO","codigo":"#000000"}
         ] %}
         <option value="{{ c.codigo }}">{{ c.nombre }}</option>
         {% endfor %}
       </select>
       <button id="aplicarColor">Aplicar</button>
+      
+      <!-- Control de opacidad -->
+      <label style="margin-left:20px;">Opacidad:</label>
+      <input type="range" id="opacidadSlider" min="0" max="100" value="60" style="width:120px; vertical-align:middle;" title="0% = Transparente (solo borde), 100% = Sólido">
+      <span id="opacidadValor" style="font-weight:bold; min-width:35px; display:inline-block;">60%</span>
+      
       <button id="seleccionarFiltrados" style="background-color:#28a745;">Seleccionar</button>
       <button id="deseleccionarTodos" style="background-color:#dc3545;">Deseleccionar</button>
       <button id="btnLimpiar" style="background-color:#ffc107;">LIMPIAR</button>
@@ -440,11 +551,6 @@ tr.seleccionado { background-color:#FFFF99 !important; }
     {% if usuario == "DSUBICI" %}
     <div id="combinar-poligonos">
       <div class="titulo-combinar">🔗 COMBINAR POLÍGONOS SELECCIONADOS</div>
-      <div style="background: #e7f3ff; border: 1px solid #2196F3; padding: 6px 8px; border-radius: 3px; margin-bottom: 5px; font-size: 10px; line-height: 1.4;">
-        ℹ️ <strong>IMPORTANTE:</strong><br>
-        • Si los polígonos <strong>se tocan</strong> → Se combinan en UNO solo ✅<br>
-        • Si NO se tocan → Se crean <strong>VARIOS polígonos separados</strong> (uno por cada grupo)
-      </div>
       <div class="fila-combinar">
         <input type="text" id="nombreCombinado" placeholder="Nombre del polígono combinado">
         <input type="color" id="colorCombinado" value="#FF6B00" title="Color del polígono combinado">
@@ -504,7 +610,11 @@ tr.seleccionado { background-color:#FFFF99 !important; }
             <td><input type="text" value="{{ p.status2 }}"></td>
             <td><input type="text" value="{{ p.status3 }}"></td>
             <td><input type="text" value="{{ p.partido }}"></td>
-            <td><input type="color" value="{{ p.color }}" class="colorInput"></td>
+            <td>
+              <input type="color" value="{% if p.color and p.color|string|lower == 'transparent' %}#FFFFFF{% else %}{{ p.color|default('#CCCCCC') }}{% endif %}" 
+                     class="colorInput" 
+                     data-transparent="{% if p.color and p.color|string|lower == 'transparent' %}true{% else %}false{% endif %}">
+            </td>
           </tr>
         {% endfor %}
         </tbody>
@@ -514,6 +624,21 @@ tr.seleccionado { background-color:#FFFF99 !important; }
     <div id="botonera-inferior">
       <button id="btn-grabar">💾 GUARDAR ▼</button>
       <button id="exportarPDF" style="background-color:#28a745;">📄 EXPORTAR PDF</button>
+      
+      <!-- Selector de capas del mapa -->
+      <select id="selectorCapas" style="background-color:#007bff; color:white; padding:10px 20px; border:none; border-radius:5px; cursor:pointer; font-weight:bold;">
+        <option value="calles" selected>🗺️ OPEN STREET MAP</option>
+        <option value="satelital">🛰️ SATELITAL</option>
+        <option value="tiff">📍 CAPA TIFF PERSONALIZADA</option>
+      </select>
+      
+      <!-- Input para cargar archivo TIFF (oculto inicialmente) -->
+      <input type="file" id="inputTIFF" accept=".tif,.tiff,.geotiff" style="display:none;">
+      <button id="btnCargarTIFF" style="display:none; background-color:#ff9800; color:white; padding:10px 15px; border:none; border-radius:5px; cursor:pointer; font-weight:bold;">
+        📁 Seleccionar archivo TIFF
+      </button>
+      <span id="nombreTIFF" style="display:none; margin-left:10px; color:#333; font-weight:bold;"></span>
+      
       <div id="menu-grabar" class="menu-grabar">
         <div id="opcion-grabar">💾 Guardar cambios</div>
         <div id="opcion-grabar-como">📝 Guardar como...</div>
@@ -523,6 +648,7 @@ tr.seleccionado { background-color:#FFFF99 !important; }
 </div>
 
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
 <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
@@ -535,7 +661,122 @@ const seleccionados = new Set();
 const esUsuarioDSUBICI = "{{ usuario }}" === "DSUBICI";
 
 const map = L.map('map').setView([-35, -63], 8);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{ attribution:'&copy; OpenStreetMap' }).addTo(map);
+
+// === CAPAS DE MAPA (disponibles para TODOS los usuarios) ===
+// Capa de calles (OpenStreetMap)
+const capaCalles = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '&copy; OpenStreetMap',
+  maxZoom: 19
+});
+
+// Capa satelital (Google Satellite)
+const capaSatelite = L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+  attribution: '&copy; Google',
+  maxZoom: 20
+});
+
+// Agregar capa OpenStreetMap por defecto
+capaCalles.addTo(map);
+
+// Variable para almacenar la capa TIFF
+let capaTIFF = null;
+
+// Selector de capas personalizado (en botonera inferior)
+document.getElementById('selectorCapas').addEventListener('change', function() {
+  const capaSeleccionada = this.value;
+  
+  // Remover todas las capas
+  map.removeLayer(capaSatelite);
+  map.removeLayer(capaCalles);
+  if(capaTIFF) {
+    map.removeLayer(capaTIFF);
+  }
+  
+  // Agregar la capa seleccionada
+  if(capaSeleccionada === 'satelital') {
+    capaSatelite.addTo(map);
+    document.getElementById('btnCargarTIFF').style.display = 'none';
+    document.getElementById('nombreTIFF').style.display = 'none';
+  } else if(capaSeleccionada === 'calles') {
+    capaCalles.addTo(map);
+    document.getElementById('btnCargarTIFF').style.display = 'none';
+    document.getElementById('nombreTIFF').style.display = 'none';
+  } else if(capaSeleccionada === 'tiff') {
+    // Mostrar botón para cargar TIFF
+    document.getElementById('btnCargarTIFF').style.display = 'inline-block';
+    
+    if(capaTIFF) {
+      // Si ya hay una capa TIFF cargada, mostrarla
+      capaTIFF.addTo(map);
+      document.getElementById('nombreTIFF').style.display = 'inline';
+    } else {
+      // Mensaje de que debe seleccionar un archivo
+      mostrarToast('Capa TIFF', 'Selecciona un archivo TIFF/GeoTIFF para mostrar como fondo', 'info');
+    }
+  }
+});
+
+// Manejar carga de archivo TIFF
+document.getElementById('btnCargarTIFF').addEventListener('click', function() {
+  document.getElementById('inputTIFF').click();
+});
+
+document.getElementById('inputTIFF').addEventListener('change', function(e) {
+  const file = e.target.files[0];
+  if(!file) return;
+  
+  console.log(`📁 Cargando archivo TIFF: ${file.name}`);
+  mostrarToast('Cargando TIFF', `Procesando ${file.name}...`, 'info');
+  
+  const reader = new FileReader();
+  
+  reader.onload = function(e) {
+    const arrayBuffer = e.target.result;
+    
+    parseGeoraster(arrayBuffer).then(georaster => {
+      console.log('✅ GeoTIFF parseado:', georaster);
+      
+      // Remover capa anterior si existe
+      if(capaTIFF) {
+        map.removeLayer(capaTIFF);
+      }
+      
+      // Crear nueva capa
+      capaTIFF = new GeoRasterLayer({
+        georaster: georaster,
+        opacity: 0.8,
+        resolution: 256,
+        debugLevel: 0
+      });
+      
+      capaTIFF.addTo(map);
+      
+      // Ajustar el mapa a los límites del TIFF
+      const bounds = [
+        [georaster.ymin, georaster.xmin],
+        [georaster.ymax, georaster.xmax]
+      ];
+      map.fitBounds(bounds);
+      
+      // Mostrar nombre del archivo
+      document.getElementById('nombreTIFF').textContent = `📍 ${file.name}`;
+      document.getElementById('nombreTIFF').style.display = 'inline';
+      
+      mostrarToast('TIFF cargado', `${file.name} cargado exitosamente`, 'success');
+      
+    }).catch(error => {
+      console.error('❌ Error parseando GeoTIFF:', error);
+      mostrarToast('Error', `No se pudo cargar el archivo TIFF: ${error.message}`, 'error');
+    });
+  };
+  
+  reader.onerror = function() {
+    console.error('❌ Error leyendo archivo');
+    mostrarToast('Error', 'No se pudo leer el archivo', 'error');
+  };
+  
+  reader.readAsArrayBuffer(file);
+});
 
 // === GEOLOCALIZACIÓN GPS (Solo punto azul) ===
 let marcadorGPS = null;
@@ -633,11 +874,81 @@ document.body.appendChild(botonGPS);
 
 poligonos.forEach((p, idx)=>{
   if(p.coords && p.coords.length>0){
-    const poly = L.polygon(p.coords,{color:"#000000",weight:0.5,fillColor:p.color,fillOpacity:0.6})
-      .addTo(map)
-      .bindPopup("<b>"+p.name+"</b><br>"+p.superficie+" has");
+    // Determinar opacidad según el color (case-insensitive)
+    const colorLower = p.color ? p.color.toLowerCase() : '';
+    const esTransparente = (colorLower === 'transparent');
+    const opacidad = esTransparente ? 0 : 0.6;
+    const fillColor = esTransparente ? '#000000' : p.color;
+    
+    console.log(`Polígono ${idx}: color="${p.color}", esTransparente=${esTransparente}, opacidad=${opacidad}`);
+    
+    const poly = L.polygon(p.coords,{color:"#000000",weight:0.5,fillColor:fillColor,fillOpacity:opacidad})
+      .addTo(map);
     poly.index = idx;
-    poly.on('click',()=>{ 
+    
+    // Variable para controlar si se acaba de hacer click
+    let clickReciente = false;
+    
+    // === EFECTO HOVER: Resaltar al pasar el mouse ===
+    poly.on('mouseover', function(e) {
+      const layer = e.target;
+      
+      // No mostrar tooltip si se acaba de hacer click
+      if(clickReciente) {
+        return;
+      }
+      
+      // Solo resaltar si NO está seleccionado
+      if(!seleccionados.has(idx)) {
+        // Aumentar grosor del borde (igual que selección)
+        layer.setStyle({
+          weight: 2,           // Mismo grosor que selección
+          color: '#000000'     // Mismo color que selección
+        });
+        
+        // Traer al frente
+        layer.bringToFront();
+      }
+      
+      // Mostrar tooltip SIEMPRE (seleccionado o no)
+      const tooltipContent = `<strong>${p.name}</strong><br>${p.superficie} has`;
+      layer.bindTooltip(tooltipContent, {
+        permanent: false,
+        direction: 'top',
+        className: 'tooltip-poligono',
+        opacity: 0.95,
+        offset: [0, -10]
+      }).openTooltip();
+    });
+    
+    poly.on('mouseout', function(e) {
+      const layer = e.target;
+      // Solo restaurar si NO está seleccionado
+      if(!seleccionados.has(idx)) {
+        layer.setStyle({
+          weight: 0.5,         // Grosor normal
+          color: '#000000'     // Negro normal
+        });
+      }
+      
+      // Cerrar tooltip (siempre)
+      layer.closeTooltip();
+    });
+    
+    poly.on('click',(e)=>{ 
+      const layer = e.target;
+      
+      // Cerrar tooltip al hacer click
+      layer.closeTooltip();
+      
+      // Marcar que se hizo click recientemente
+      clickReciente = true;
+      
+      // Permitir que vuelva a aparecer tooltip después de un momento
+      setTimeout(() => {
+        clickReciente = false;
+      }, 300);
+      
       toggleSeleccion(idx); 
       scrollFila(idx);
       
@@ -678,6 +989,384 @@ poligonos.forEach((p, idx)=>{
 // Mostrar sección de combinar solo para DSUBICI
 if(esUsuarioDSUBICI) {
   document.getElementById('combinar-poligonos').style.display = 'block';
+  document.getElementById('botonesMapaDSUBICI').style.display = 'block';
+}
+
+// === AUTO-DETECCIÓN DE TRANSPARENTES POR VALOR DE COLOR ===
+// Cuando el input type="color" recibe "transparent", lo convierte a negro
+// Necesitamos detectar cuáles polígonos deberían ser transparentes
+console.log('🔍 ========== DETECTANDO TRANSPARENTES ==========');
+
+// Buscar en los datos originales de Python
+poligonos.forEach((p, idx) => {
+  const colorOriginal = p.color ? String(p.color).toLowerCase() : '';
+  
+  if(colorOriginal === 'transparent') {
+    console.log(`🔵 Detectado transparente en datos Python: Polígono ${idx} "${p.name}"`);
+    
+    // Buscar la fila en la tabla
+    const fila = document.querySelector(`#tablaPoligonos tbody tr[data-index="${idx}"]`);
+    if(fila) {
+      const colorInput = fila.querySelector('input.colorInput');
+      if(colorInput) {
+        // Forzar valores correctos
+        colorInput.value = '#FFFFFF';
+        colorInput.setAttribute('data-transparent', 'true');
+        console.log(`   ✅ Input configurado como transparente`);
+      }
+    }
+    
+    // Aplicar transparencia al polígono en el mapa
+    if(leafletPoligonos[idx]) {
+      leafletPoligonos[idx].setStyle({
+        fillColor: '#000000',
+        fillOpacity: 0
+      });
+      console.log(`   ✅ Polígono en mapa configurado como transparente`);
+    }
+  }
+});
+
+console.log('🔍 ========== FIN DETECCIÓN ==========');
+
+// === AUTO-CORRECCIÓN DE TRANSPARENTES ===
+// Verificar que todos los polígonos marcados como transparentes realmente lo sean
+console.log('🔧 ========== VERIFICANDO TRANSPARENTES ==========');
+let corregidos = 0;
+
+document.querySelectorAll('input.colorInput').forEach((input, tableIdx) => {
+  const dataTransparent = input.getAttribute('data-transparent');
+  
+  if(dataTransparent === 'true') {
+    // Buscar el índice real del polígono
+    const tr = input.closest('tr');
+    const idx = getFilaIndex(tr);
+    
+    if(leafletPoligonos[idx]) {
+      const opacidadActual = leafletPoligonos[idx].options.fillOpacity;
+      const nombrePoly = tr.querySelectorAll('input')[1].value;
+      
+      if(opacidadActual !== 0) {
+        console.log(`⚠️ CORRIGIENDO: Polígono ${idx} "${nombrePoly}" debería ser transparente (opacidad actual: ${opacidadActual})`);
+        leafletPoligonos[idx].setStyle({
+          fillColor: '#000000',
+          fillOpacity: 0
+        });
+        corregidos++;
+      } else {
+        console.log(`✅ OK: Polígono ${idx} "${nombrePoly}" ya es transparente`);
+      }
+    }
+  }
+});
+
+if(corregidos > 0) {
+  console.log(`🔧 Se corrigieron ${corregidos} polígono(s) transparente(s)`);
+} else {
+  console.log(`✅ Todos los transparentes están correctos`);
+}
+console.log('🔧 ========== FIN VERIFICACIÓN ==========');
+
+// === CONTROL DE OPACIDAD ===
+const opacidadSlider = document.getElementById('opacidadSlider');
+const opacidadValor = document.getElementById('opacidadValor');
+
+// Actualizar valor mostrado cuando se mueve el slider
+opacidadSlider.addEventListener('input', function() {
+  opacidadValor.textContent = this.value + '%';
+});
+
+// Aplicar opacidad cuando se suelta el slider
+opacidadSlider.addEventListener('change', function() {
+  const opacidad = parseFloat(this.value) / 100;
+  
+  // Verificar si hay polígonos seleccionados
+  if(seleccionados.size === 0) {
+    mostrarToast('Atención', 'Debes seleccionar al menos un polígono para cambiar su opacidad', 'warning');
+    return;
+  }
+  
+  let aplicados = 0;
+  
+  // Aplicar opacidad a TODOS los polígonos seleccionados (incluidos transparentes)
+  seleccionados.forEach(idx => {
+    const fila = document.querySelector(`#tablaPoligonos tbody tr[data-index="${idx}"]`);
+    
+    if(fila && leafletPoligonos[idx]) {
+      const colorInput = fila.querySelector('input.colorInput');
+      const esTransparente = colorInput.getAttribute('data-transparent') === 'true';
+      
+      // Si era transparente y ahora le damos opacidad > 0, ya no es transparente
+      if(esTransparente && opacidad > 0) {
+        colorInput.setAttribute('data-transparent', 'false');
+        // Si no tiene color válido, asignar gris
+        if(colorInput.value === '#FFFFFF') {
+          colorInput.value = '#CCCCCC';
+        }
+        console.log(`🔄 Polígono ${idx} dejó de ser transparente (opacidad: ${this.value}%)`);
+      }
+      
+      // Si la opacidad es 0, marcarlo como transparente
+      if(opacidad === 0) {
+        colorInput.setAttribute('data-transparent', 'true');
+        colorInput.value = '#FFFFFF';
+        console.log(`🔄 Polígono ${idx} ahora es transparente`);
+      }
+      
+      leafletPoligonos[idx].setStyle({ fillOpacity: opacidad });
+      aplicados++;
+    }
+  });
+  
+  if(aplicados > 0) {
+    mostrarToast('Opacidad actualizada', `Opacidad establecida en ${this.value}% para ${aplicados} polígono(s)`, 'success');
+  }
+});
+
+// === DIBUJAR Y ELIMINAR POLÍGONOS (solo DSUBICI) ===
+if(esUsuarioDSUBICI) {
+  let dibujando = false;
+  let poligonoTemporal = null;
+  let puntosPoligono = [];
+  
+  // Función para iniciar dibujo
+  document.getElementById('btnDibujarPoligono').addEventListener('click', function() {
+    if(dibujando) return;
+    
+    dibujando = true;
+    puntosPoligono = [];
+    document.getElementById('btnDibujarPoligono').style.display = 'none';
+    document.getElementById('btnCancelarDibujo').style.display = 'block';
+    document.getElementById('btnGuardarPoligono').style.display = 'none';
+    
+    map.getContainer().style.cursor = 'crosshair';
+    
+    mostrarToast('Modo dibujo activado', 'Click en el mapa para agregar puntos del polígono', 'info');
+    
+    // Event listener para agregar puntos
+    map.on('click', agregarPunto);
+  });
+  
+  // Función para cancelar dibujo
+  document.getElementById('btnCancelarDibujo').addEventListener('click', function() {
+    cancelarDibujo();
+  });
+  
+  // Función para guardar polígono
+  document.getElementById('btnGuardarPoligono').addEventListener('click', function() {
+    guardarPoligono();
+  });
+  
+  function agregarPunto(e) {
+    if(!dibujando) return;
+    
+    puntosPoligono.push([e.latlng.lat, e.latlng.lng]);
+    
+    // Dibujar polígono temporal
+    if(poligonoTemporal) {
+      map.removeLayer(poligonoTemporal);
+    }
+    
+    if(puntosPoligono.length > 0) {
+      poligonoTemporal = L.polygon(puntosPoligono, {
+        color: '#FF6B00',
+        weight: 2,
+        fillColor: '#FF6B00',
+        fillOpacity: 0.3,
+        dashArray: '5, 5'
+      }).addTo(map);
+    }
+    
+    // Mostrar botón guardar si tiene al menos 3 puntos
+    if(puntosPoligono.length >= 3) {
+      document.getElementById('btnGuardarPoligono').style.display = 'block';
+      mostrarToast('Polígono listo', `${puntosPoligono.length} puntos. Click en GUARDAR para finalizar o sigue agregando puntos.`, 'success');
+    } else {
+      mostrarToast('Punto agregado', `${puntosPoligono.length} punto(s). Necesitas al menos 3 puntos.`, 'info');
+    }
+  }
+  
+  function guardarPoligono() {
+    if(!dibujando) return;
+    if(puntosPoligono.length < 3) {
+      mostrarToast('Error', 'Necesitas al menos 3 puntos para crear un polígono', 'error');
+      return;
+    }
+    
+    // Remover event listener de click
+    map.off('click', agregarPunto);
+    
+    // Pedir nombre del polígono
+    const nombre = prompt('Nombre del polígono:', 'Nuevo Campo');
+    if(!nombre || nombre.trim() === '') {
+      mostrarToast('Cancelado', 'Debe ingresar un nombre para el polígono', 'warning');
+      // Volver a activar el listener para seguir dibujando
+      map.on('click', agregarPunto);
+      return;
+    }
+    
+    // Pedir partido
+    const partido = prompt('Partido:', '');
+    if(partido === null) {
+      mostrarToast('Cancelado', 'Guardado de polígono cancelado', 'warning');
+      // Volver a activar el listener para seguir dibujando
+      map.on('click', agregarPunto);
+      return;
+    }
+    
+    // Color por defecto verde
+    const color = '#00FF00';
+    
+    // Calcular superficie aproximada usando Turf
+    const polygon = turf.polygon([puntosPoligono.map(p => [p[1], p[0]]).concat([[puntosPoligono[0][1], puntosPoligono[0][0]]])]);
+    const area = turf.area(polygon);
+    const hectareas = (area / 10000).toFixed(2);
+    
+    // Remover polígono temporal
+    if(poligonoTemporal) {
+      map.removeLayer(poligonoTemporal);
+    }
+    
+    // Crear polígono definitivo
+    const nuevoIdx = leafletPoligonos.length;
+    const nuevoPoly = L.polygon(puntosPoligono, {
+      color: '#000000',
+      weight: 0.5,
+      fillColor: color,
+      fillOpacity: 0.6
+    }).addTo(map);
+    
+    nuevoPoly.index = nuevoIdx;
+    nuevoPoly.on('click', () => {
+      toggleSeleccion(nuevoIdx);
+      scrollFila(nuevoIdx);
+      
+      if(esUsuarioDSUBICI) {
+        setTimeout(() => {
+          const fila = document.querySelector(`#tablaPoligonos tbody tr[data-index="${nuevoIdx}"]`);
+          if(fila) {
+            const inputNombre = fila.querySelectorAll('input')[1];
+            if(inputNombre) {
+              inputNombre.focus();
+              if(inputNombre.value && inputNombre.value.trim() !== '') {
+                inputNombre.select();
+              } else {
+                inputNombre.setSelectionRange(0, 0);
+              }
+              
+              const estiloOriginalBg = inputNombre.style.backgroundColor;
+              const estiloOriginalBorder = inputNombre.style.border;
+              
+              inputNombre.style.backgroundColor = '#fff3cd';
+              inputNombre.style.border = '2px solid #ffc107';
+              inputNombre.style.transition = 'all 0.2s ease';
+              
+              setTimeout(() => {
+                inputNombre.style.backgroundColor = estiloOriginalBg;
+                inputNombre.style.border = estiloOriginalBorder;
+              }, 500);
+            }
+          }
+        }, 100);
+      }
+    });
+    
+    leafletPoligonos.push(nuevoPoly);
+    
+    // Agregar fila a la tabla
+    const tbody = document.querySelector('#tablaPoligonos tbody');
+    const nuevaFila = document.createElement('tr');
+    nuevaFila.setAttribute('data-index', nuevoIdx);
+    
+    nuevaFila.innerHTML = `
+      <td><input type="checkbox" class="selectFila"></td>
+      <td><input type="text" value="${nombre}"></td>
+      <td><input type="text" value="${hectareas}"></td>
+      <td><input type="text" value=""></td>
+      <td><input type="text" value=""></td>
+      <td><input type="text" value=""></td>
+      <td><input type="text" value=""></td>
+      <td><input type="text" value="${partido}"></td>
+      <td><input type="color" value="${color}" class="colorInput" data-transparent="false"></td>
+    `;
+    
+    tbody.appendChild(nuevaFila);
+    
+    // Resetear estado
+    dibujando = false;
+    puntosPoligono = [];
+    poligonoTemporal = null;
+    map.getContainer().style.cursor = '';
+    document.getElementById('btnDibujarPoligono').style.display = 'block';
+    document.getElementById('btnCancelarDibujo').style.display = 'none';
+    document.getElementById('btnGuardarPoligono').style.display = 'none';
+    
+    mostrarToast('Polígono creado', `"${nombre}" agregado con ${hectareas} has en ${partido}`, 'success');
+    
+    // Regenerar filtro de colores
+    setTimeout(() => regenerarFiltroColores(), 200);
+  }
+  
+  function cancelarDibujo() {
+    dibujando = false;
+    puntosPoligono = [];
+    
+    if(poligonoTemporal) {
+      map.removeLayer(poligonoTemporal);
+      poligonoTemporal = null;
+    }
+    
+    map.off('click', agregarPunto);
+    map.getContainer().style.cursor = '';
+    
+    document.getElementById('btnDibujarPoligono').style.display = 'block';
+    document.getElementById('btnCancelarDibujo').style.display = 'none';
+    document.getElementById('btnGuardarPoligono').style.display = 'none';
+    
+    mostrarToast('Dibujo cancelado', 'Modo dibujo desactivado', 'info');
+  }
+  
+  // Función para eliminar polígonos seleccionados
+  document.getElementById('btnEliminarSeleccionados').addEventListener('click', function() {
+    if(seleccionados.size === 0) {
+      mostrarToast('Atención', 'Debe seleccionar al menos un polígono para eliminar', 'warning');
+      return;
+    }
+    
+    const cantidad = seleccionados.size;
+    const confirmMsg = `¿Está seguro de eliminar ${cantidad} polígono(s) seleccionado(s)?\n\n⚠️ Esta acción NO se puede deshacer hasta que guarde el archivo.`;
+    
+    if(!confirm(confirmMsg)) {
+      return;
+    }
+    
+    // Obtener índices en orden inverso para eliminar sin problemas
+    const indicesAEliminar = Array.from(seleccionados).sort((a, b) => b - a);
+    
+    // Eliminar del mapa
+    indicesAEliminar.forEach(idx => {
+      if(leafletPoligonos[idx]) {
+        map.removeLayer(leafletPoligonos[idx]);
+        leafletPoligonos[idx] = null;
+      }
+    });
+    
+    // Eliminar filas de la tabla
+    indicesAEliminar.forEach(idx => {
+      const fila = document.querySelector(`#tablaPoligonos tbody tr[data-index="${idx}"]`);
+      if(fila) {
+        fila.remove();
+      }
+    });
+    
+    // Limpiar selección
+    seleccionados.clear();
+    
+    mostrarToast('Polígonos eliminados', `${cantidad} polígono(s) eliminado(s). Recuerde GUARDAR los cambios.`, 'success');
+    
+    // Regenerar filtro de colores
+    setTimeout(() => regenerarFiltroColores(), 200);
+  });
 }
 
 // === FUNCIÓN TOAST ===
@@ -908,7 +1597,6 @@ if(esUsuarioDSUBICI) {
       // Asignar índice al nuevo polígono
       const nuevoIdx = leafletPoligonos.length;
       nuevoPoly.index = nuevoIdx;
-      nuevoPoly.bindPopup("<b>" + nombreNuevo + "</b><br>" + superficieTotal.toFixed(2) + " has");
       nuevoPoly.on('click', () => { 
         toggleSeleccion(nuevoIdx); 
         scrollFila(nuevoIdx);
@@ -979,7 +1667,7 @@ if(esUsuarioDSUBICI) {
         <td><input type="text" value="${inputsPrimera[5].value}"></td>
         <td><input type="text" value="${inputsPrimera[6].value}"></td>
         <td><input type="text" value="${inputsPrimera[7].value}"></td>
-        <td><input type="color" value="${colorNuevo}" class="colorInput"></td>
+        <td><input type="color" value="${colorNuevo}" class="colorInput" data-transparent="false"></td>
       `;
       
       tbody.appendChild(nuevaFila);
@@ -1095,7 +1783,10 @@ function regenerarFiltroColores() {
   document.querySelectorAll('#tablaPoligonos tbody tr').forEach(tr => {
     const colorInput = tr.querySelector('input.colorInput');
     if(colorInput) {
-      const color = colorInput.value.toUpperCase();
+      // Verificar si es transparente
+      const esTransparente = colorInput.getAttribute('data-transparent') === 'true';
+      const color = esTransparente ? 'TRANSPARENT' : colorInput.value.toUpperCase();
+      
       if(!coloresUnicos.has(color)) {
         coloresUnicos.set(color, 0);
       }
@@ -1111,11 +1802,17 @@ function regenerarFiltroColores() {
     option.value = color;
     
     const cuadrado = '■';
-    const nombreColor = obtenerNombreColor(color);
+    const nombreColor = color === 'TRANSPARENT' ? 'TRANSPARENTE' : obtenerNombreColor(color);
     option.textContent = `${cuadrado} ${nombreColor} (${cantidad})`;
     
-    option.style.backgroundColor = color;
-    option.style.color = esColorClaro(color) ? '#000000' : '#FFFFFF';
+    if(color === 'TRANSPARENT') {
+      option.style.backgroundColor = '#FFFFFF';
+      option.style.color = '#000000';
+      option.style.border = '1px solid #000000';
+    } else {
+      option.style.backgroundColor = color;
+      option.style.color = esColorClaro(color) ? '#000000' : '#FFFFFF';
+    }
     option.style.fontWeight = 'bold';
     
     selectColor.appendChild(option);
@@ -1130,6 +1827,18 @@ function regenerarFiltroColores() {
 
 function obtenerNombreColor(hex) {
   const coloresNombres = {
+    // Colores llamativos nuevos
+    '#FF6B6B': 'CORAL VIVO',
+    '#4ECDC4': 'TURQUESA TROPICAL',
+    '#C0F542': 'LIMA ELÉCTRICO',
+    '#9D4EDD': 'VIOLETA NEÓN',
+    '#FFB347': 'MELOCOTÓN SUNRISE',
+    '#FF006E': 'ROSA FUCSIA',
+    '#1E90FF': 'AZUL ELÉCTRICO',
+    '#50C878': 'VERDE ESMERALDA',
+    '#FFD700': 'DORADO SUNSET',
+    '#E6B0FF': 'LAVANDA PASTEL',
+    // Colores básicos
     '#FF0000': 'ROJO',
     '#00FF00': 'VERDE',
     '#0000FF': 'AZUL',
@@ -1141,12 +1850,7 @@ function obtenerNombreColor(hex) {
     '#808080': 'GRIS',
     '#000000': 'NEGRO',
     '#FFFFFF': 'BLANCO',
-    '#B5EAD7': 'VERDE MENTA',
-    '#FFDAC1': 'DURAZNO',
-    '#CBAACB': 'LAVANDA',
-    '#E2F0CB': 'VERDE CLARO',
-    '#CCCCCC': 'GRIS CLARO',
-    '#FF6B00': 'NARANJA INTENSO'
+    '#CCCCCC': 'GRIS CLARO'
   };
   
   return coloresNombres[hex.toUpperCase()] || hex;
@@ -1165,6 +1869,29 @@ generarFiltroColores();
 
 document.querySelector('#tablaPoligonos tbody').addEventListener('change', function(e) {
   if(e.target.classList.contains('colorInput')) {
+    // Obtener el índice de la fila
+    const fila = e.target.closest('tr');
+    const idx = getFilaIndex(fila);
+    const color = e.target.value;
+    
+    // Aplicar color al polígono en el mapa
+    if(leafletPoligonos[idx]) {
+      if(color === 'transparent') {
+        // Transparente: solo borde
+        leafletPoligonos[idx].setStyle({
+          fillColor: '#000000',
+          fillOpacity: 0
+        });
+      } else {
+        // Color normal con opacidad del slider
+        const opacidad = parseFloat(document.getElementById('opacidadSlider').value) / 100;
+        leafletPoligonos[idx].setStyle({
+          fillColor: color,
+          fillOpacity: opacidad
+        });
+      }
+    }
+    
     setTimeout(() => regenerarFiltroColores(), 100);
   }
 });
@@ -1207,7 +1934,10 @@ function aplicarFiltros() {
     
     if(filtroColor && mostrar) {
       const colorInput = row.querySelector('input.colorInput');
-      if(colorInput.value.toUpperCase() !== filtroColor.toUpperCase()) {
+      const esTransparente = colorInput.getAttribute('data-transparent') === 'true';
+      const colorActual = esTransparente ? 'TRANSPARENT' : colorInput.value.toUpperCase();
+      
+      if(colorActual !== filtroColor.toUpperCase()) {
         mostrar = false;
       }
     }
@@ -1403,12 +2133,42 @@ document.getElementById('aplicarColor').addEventListener('click', ()=>{
   let count = 0;
   seleccionados.forEach(idx=>{
     const fila = document.querySelector(`#tablaPoligonos tbody tr[data-index="${idx}"]`);
-    fila.querySelector('input.colorInput').value = color;
-    if(leafletPoligonos[idx]) leafletPoligonos[idx].setStyle({fillColor:color});
+    const colorInput = fila.querySelector('input.colorInput');
+    
+    if(color === 'transparent') {
+      // Marcar como transparente
+      colorInput.value = '#FFFFFF';
+      colorInput.setAttribute('data-transparent', 'true');
+    } else {
+      // Color normal
+      colorInput.value = color;
+      colorInput.setAttribute('data-transparent', 'false');
+    }
+    
+    if(leafletPoligonos[idx]) {
+      if(color === 'transparent') {
+        // Color transparente: solo borde visible, relleno 0% opacidad
+        leafletPoligonos[idx].setStyle({
+          fillColor: '#000000',
+          fillOpacity: 0
+        });
+      } else {
+        // Color normal: aplicar color con opacidad del slider
+        const opacidad = parseFloat(document.getElementById('opacidadSlider').value) / 100;
+        leafletPoligonos[idx].setStyle({
+          fillColor: color,
+          fillOpacity: opacidad
+        });
+      }
+    }
     count++;
   });
   
-  mostrarToast('Color aplicado', `Color aplicado a ${count} registros`, 'success');
+  if(color === 'transparent') {
+    mostrarToast('Transparente aplicado', `${count} polígonos ahora son transparentes (solo borde)`, 'success');
+  } else {
+    mostrarToast('Color aplicado', `Color aplicado a ${count} registros`, 'success');
+  }
   
   regenerarFiltroColores();
 });
@@ -1497,7 +2257,10 @@ document.addEventListener('click',function(e){
 });
 
 function obtenerDatos(){
+  console.log('📊 ========== INICIANDO obtenerDatos() ==========');
   const filas = [];
+  let contadorTransparentes = 0;
+  
   document.querySelectorAll('#tablaPoligonos tbody tr').forEach(tr => {
     const idx = getFilaIndex(tr);
     const inputs = tr.querySelectorAll('input');
@@ -1505,6 +2268,21 @@ function obtenerDatos(){
     if(leafletPoligonos[idx]){
       coords = leafletPoligonos[idx].getLatLngs()[0].map(p => `${p.lng},${p.lat}`).join(" ");
     }
+    
+    // Detectar si es transparente
+    const colorInput = inputs[8];
+    const esTransparente = colorInput.getAttribute('data-transparent') === 'true';
+    const colorGuardar = esTransparente ? 'transparent' : colorInput.value;
+    
+    // DEBUG: Mostrar polígonos transparentes
+    if(esTransparente) {
+      contadorTransparentes++;
+      console.log(`🔵 Polígono ${idx} "${inputs[1].value}": TRANSPARENTE`);
+      console.log(`   - value en input: ${colorInput.value}`);
+      console.log(`   - data-transparent: ${colorInput.getAttribute('data-transparent')}`);
+      console.log(`   - Se guardará como: "${colorGuardar}"`);
+    }
+    
     filas.push({
       name: inputs[1].value,
       superficie: inputs[2].value,
@@ -1513,22 +2291,35 @@ function obtenerDatos(){
       status2: inputs[5].value,
       status3: inputs[6].value,
       partido: inputs[7].value,
-      color: inputs[8].value,
-      colorOriginal: inputs[8].value,
+      color: colorGuardar,
+      colorOriginal: colorGuardar,
       COORDENADAS: coords
     });
   });
+  
+  console.log(`✅ Total filas procesadas: ${filas.length}`);
+  console.log(`⬜ Polígonos transparentes encontrados: ${contadorTransparentes}`);
+  console.log('📊 ========== FIN obtenerDatos() ==========');
+  
   return filas;
 }
 
 document.getElementById('opcion-grabar').addEventListener('click',()=>{
+  console.log('💾 ========== GUARDANDO ARCHIVO ==========');
+  const datosAGuardar = obtenerDatos();
+  
+  // Verificar cuántos transparentes hay en los datos
+  const transparentesEnDatos = datosAGuardar.filter(d => d.color === 'transparent').length;
+  console.log(`💾 Enviando al servidor: ${datosAGuardar.length} polígonos (${transparentesEnDatos} transparentes)`);
+  
   fetch('/guardar', {
     method:'POST',
     headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({datos: obtenerDatos()})
+    body:JSON.stringify({datos: datosAGuardar})
   })
   .then(r=>r.json())
   .then(resp => {
+    console.log('✅ Respuesta del servidor:', resp);
     if(resp.success) {
       mostrarToast(resp.mensaje, resp.detalle || 'Operación completada', resp.tipo || 'success');
     } else {

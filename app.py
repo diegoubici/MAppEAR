@@ -205,11 +205,25 @@ def guardar_archivo(usuario, nombre_archivo, bytes_data):
 # === Funciones de utilidad para colores ===
 
 def procesar_color_con_transparencia(color_hex):
-    """Procesa un color HEX y extrae el color base y la opacidad."""
+    """Procesa un color HEX y extrae el color base y la opacidad.
+    
+    Soporta:
+    - Colores hex normales: #FF0000 (rojo)
+    - Colores hex con alpha: #FF0000AA (rojo semi-transparente)
+    - String "transparent": devuelve color especial y opacity=0
+    """
     if not color_hex or not isinstance(color_hex, str):
         return {"color": "#CCCCCC", "opacity": 1.0}
     
-    color_hex = str(color_hex).strip().upper()
+    color_hex = str(color_hex).strip()
+    
+    # ✅ NUEVO: Detectar "transparent" ANTES de procesar como hex
+    if color_hex.lower() == 'transparent':
+        print(f"🔵 Color transparent detectado - se mantendrá como 'transparent'")
+        return {"color": "transparent", "opacity": 0.0}
+    
+    # Continuar con procesamiento normal de colores hex
+    color_hex = color_hex.upper()
     
     if not color_hex.startswith("#"):
         color_hex = "#" + color_hex
@@ -217,6 +231,7 @@ def procesar_color_con_transparencia(color_hex):
     hex_sin_hash = color_hex[1:]
     
     if len(hex_sin_hash) == 8:
+        # Color con alpha (8 dígitos hex: RRGGBBAA)
         color_base = "#" + hex_sin_hash[:6]
         alpha_hex = hex_sin_hash[6:8]
         try:
@@ -227,9 +242,11 @@ def procesar_color_con_transparencia(color_hex):
         return {"color": color_base, "opacity": opacity}
     
     elif len(hex_sin_hash) == 6:
+        # Color sin alpha (6 dígitos hex: RRGGBB)
         return {"color": color_hex, "opacity": 1.0}
     
     elif len(hex_sin_hash) == 3:
+        # Color corto (3 dígitos hex: RGB)
         r, g, b = hex_sin_hash
         color_expandido = f"#{r}{r}{g}{g}{b}{b}"
         return {"color": color_expandido, "opacity": 1.0}
