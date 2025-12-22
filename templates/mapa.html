@@ -877,10 +877,18 @@ poligonos.forEach((p, idx)=>{
     // Determinar opacidad según el color (case-insensitive)
     const colorLower = p.color ? p.color.toLowerCase() : '';
     const esTransparente = (colorLower === 'transparent');
-    const opacidad = esTransparente ? 0 : 0.6;
+    
+    // Leer opacidad del backend, o usar 0 si es transparente, o 0.6 por defecto
+    let opacidad = 0.6;  // Default
+    if(esTransparente) {
+      opacidad = 0;
+    } else if(p.opacity !== undefined && p.opacity !== null) {
+      opacidad = parseFloat(p.opacity);
+    }
+    
     const fillColor = esTransparente ? '#000000' : p.color;
     
-    console.log(`Polígono ${idx}: color="${p.color}", esTransparente=${esTransparente}, opacidad=${opacidad}`);
+    console.log(`Polígono ${idx}: color="${p.color}", esTransparente=${esTransparente}, opacidad=${opacidad} (de backend: ${p.opacity})`);
     
     const poly = L.polygon(p.coords,{color:"#000000",weight:0.5,fillColor:fillColor,fillOpacity:opacidad})
       .addTo(map);
@@ -2294,6 +2302,12 @@ function obtenerDatos(){
     const esTransparente = colorInput.getAttribute('data-transparent') === 'true';
     const colorGuardar = esTransparente ? 'transparent' : colorInput.value;
     
+    // Obtener opacidad actual del polígono en el mapa
+    let opacidad = 0.6; // Por defecto
+    if(leafletPoligonos[idx]) {
+      opacidad = leafletPoligonos[idx].options.fillOpacity || 0.6;
+    }
+    
     // DEBUG: Mostrar polígonos transparentes
     if(esTransparente) {
       contadorTransparentes++;
@@ -2301,6 +2315,7 @@ function obtenerDatos(){
       console.log(`   - value en input: ${colorInput.value}`);
       console.log(`   - data-transparent: ${colorInput.getAttribute('data-transparent')}`);
       console.log(`   - Se guardará como: "${colorGuardar}"`);
+      console.log(`   - Opacidad: ${opacidad}`);
     }
     
     filas.push({
@@ -2313,6 +2328,7 @@ function obtenerDatos(){
       partido: inputs[7].value,
       color: colorGuardar,
       colorOriginal: colorGuardar,
+      opacidad: opacidad,  // ← NUEVO: Agregar opacidad
       COORDENADAS: coords
     });
   });
