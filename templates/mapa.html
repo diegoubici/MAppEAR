@@ -13,6 +13,33 @@ header span { float:right; line-height:30px; }
 
 #map { position: fixed; top: 50px; left: 0; width: 100%; height: calc(100% - 50px); z-index:0; }
 
+/* === ELIMINAR CUADRADOS/OUTLINES DE POLÍGONOS === */
+.leaflet-interactive {
+  outline: none !important;
+}
+
+path.leaflet-interactive {
+  outline: none !important;
+}
+
+.leaflet-zoom-animated {
+  outline: none !important;
+}
+
+svg path {
+  outline: none !important;
+}
+
+/* Evitar bounding boxes visuales */
+.leaflet-overlay-pane svg {
+  outline: none !important;
+}
+
+.leaflet-overlay-pane path {
+  outline: none !important;
+  stroke-dasharray: none !important;
+}
+
 #tabla-container {
   position: absolute;
   top: 50px;
