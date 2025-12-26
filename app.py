@@ -51,6 +51,10 @@ else:
 app = Flask(__name__)
 app.secret_key = FLASK_SECRET_KEY
 
+# === OPTIMIZACIÓN: Compresión GZIP automática ===
+from flask_compress import Compress
+Compress(app)  # Reduce tamaño de respuestas en ~70%
+
 # Usuarios
 USERS = {
     "DSUBICI": {"password": "Banfi138", "rol": "admin"},
@@ -58,10 +62,7 @@ USERS = {
     "usuario2": {"password": "contraseña2", "rol": "user"},
     "usuario3": {"password": "contraseña3", "rol": "user"},
     "usuario4": {"password": "contraseña4", "rol": "user"},
-    "usuario5": {"password": "contraseña5", "rol": "user"},
-    "usuario6": {"password": "contraseña6", "rol": "user"},
-    "usuario7": {"password": "contraseña7", "rol": "user"},
-    "RIVADAVIA": {"password": "rivadavia", "rol": "user"},
+    "RIVADAVIA": {"password": "rivadavia5", "rol": "user"},
 }
 
 # === UTILIDADES LOCALES ===

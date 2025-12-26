@@ -682,6 +682,10 @@ tr.seleccionado { background-color:#FFFF99 !important; }
 <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
 
 <script>
+// Esperar a que TODO se cargue (incluido Leaflet)
+window.onload = function() {
+console.log('✅ Página cargada - Iniciando MAppEAR');
+
 const poligonos = {{ poligonos|tojson }};
 const leafletPoligonos = [];
 const seleccionados = new Set();
@@ -2482,6 +2486,9 @@ document.getElementById("btnLimpiar").addEventListener("click", function() {
     
     mostrarToast('Limpieza completada', 'Filtros y campos de edición limpiados', 'info');
 });
+
+console.log('✅ MAppEAR inicializado correctamente');
+}; // Fin de window.onload
 
 </script>
 </body>
