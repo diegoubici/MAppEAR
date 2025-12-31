@@ -712,7 +712,7 @@ def cargar_archivo_desde_carpeta():
         if ES_LOCAL:
             bio = leer_archivo_local(usuario, nombre_archivo)
         else:
-            bio = leer_archivo_r2(usuario, nombre_archivo)
+            bio = descargar_de_r2_a_bytesio(usuario, nombre_archivo)
         
         if not bio:
             return jsonify({"success": False, "mensaje": "Archivo no encontrado"}), 404
