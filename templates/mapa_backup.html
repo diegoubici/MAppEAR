@@ -321,101 +321,84 @@ tr.seleccionado { background-color:#FFFF99 !important; }
 /* === TOAST NOTIFICATIONS === */
 .toast {
   position: fixed;
-  bottom: 20px;
-  right: -250px;
-  width: 150px;
-  height: 100px;
-  background: #007BFF;
-  color: white;
-  border-radius: 5px;
-  box-shadow: 0 3px 10px rgba(0,0,0,0.25);
-  padding: 12px 15px;
+  bottom: 30px;
+  right: 30px;
+  min-width: 320px;
+  max-width: 450px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+  padding: 0;
   z-index: 10000;
-  animation: slideInFromRight 0.8s ease-out forwards;
-  font-family: Tahoma, Geneva, sans-serif;
-  font-size: 18px;
-  font-weight: 700;
-  text-align: center;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-direction: column;
+  animation: slideIn 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
 }
 
 .toast.hiding {
-  animation: slideOutToRight 0.4s ease-in forwards;
+  animation: slideOut 0.3s ease-in forwards;
 }
 
 .toast-header {
-  padding: 0;
-  margin: 0;
-  font-family: Tahoma, Geneva, sans-serif;
-  font-size: 18px;
-  display: block;
-  border: none;
-  background: transparent;
-  color: white;
-  font-weight: 700;
-  text-transform: uppercase;
+  padding: 16px 20px;
+  font-weight: 600;
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid rgba(0,0,0,0.08);
 }
 
 .toast-body {
-  padding: 0;
-  margin: 0;
-  font-family: Tahoma, Geneva, sans-serif;
-  font-size: 18px;
-  color: white;
-  line-height: 1.2;
-  font-weight: 700;
-  text-transform: uppercase;
+  padding: 14px 20px;
+  font-size: 13px;
+  color: #555;
+  line-height: 1.5;
 }
 
 .toast-icon {
-  display: inline-block;
-  font-size: 18px;
-  margin-right: 6px;
+  font-size: 22px;
+  line-height: 1;
 }
 
 .toast.success .toast-header {
-  background: transparent;
+  background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
   color: white;
 }
 
 .toast.error .toast-header {
-  background: transparent;
+  background: linear-gradient(135deg, #eb3349 0%, #f45c43 100%);
   color: white;
 }
 
 .toast.warning .toast-header {
-  background: transparent;
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
   color: white;
 }
 
 .toast.info .toast-header {
-  background: transparent;
+  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
   color: white;
 }
 
-@keyframes slideInFromRight {
+@keyframes slideIn {
   from { 
-    right: -250px;
+    transform: translateX(450px) scale(0.8);
     opacity: 0;
   }
   to { 
-    right: 20px;
+    transform: translateX(0) scale(1);
     opacity: 1;
   }
 }
 
-@keyframes slideOutToRight {
+@keyframes slideOut {
   from { 
-    right: 20px;
+    transform: translateX(0) scale(1);
     opacity: 1;
   }
   to { 
-    right: -250px;
+    transform: translateX(450px) scale(0.8);
     opacity: 0;
   }
 }
@@ -556,27 +539,28 @@ tr.seleccionado { background-color:#FFFF99 !important; }
 <span><a href="/logout" style="color:white;">Cerrar sesión</a></span>
 </header>
 
-<!-- PANEL DE ARCHIVOS DISPONIBLES -->
-<div id="panel-archivos-container" style="position:absolute; top:60px; left:220px; width:450px; z-index:1000; background:white; border-radius:5px; box-shadow:0 2px 8px rgba(0,0,0,0.2); display:none;">
+<!-- PANEL DE ARCHIVOS CARGADOS -->
+<div id="panel-archivos-container" style="position:absolute; top:60px; left:10px; width:400px; z-index:1000; background:white; border-radius:5px; box-shadow:0 2px 8px rgba(0,0,0,0.2); display:none;">
   <div style="padding:10px; background:#0056b3; color:white; border-radius:5px 5px 0 0; display:flex; justify-content:space-between; align-items:center;">
     <div>
-      <strong>📁 Archivos disponibles</strong>
-      <span id="contador-archivos" style="margin-left:10px; font-size:12px;">0 abiertos | 0 polígonos</span>
+      <strong>📁 Archivos cargados</strong>
+      <span id="contador-archivos" style="margin-left:10px; font-size:12px;">0 archivos | 0 polígonos</span>
     </div>
     <div>
+      <button onclick="guardarTodosLosArchivos()" style="background:#28a745; color:white; border:none; padding:5px 10px; border-radius:3px; cursor:pointer; margin-right:5px;">
+        💾 Guardar Todos
+      </button>
       <button onclick="togglePanelArchivos()" style="background:#dc3545; color:white; border:none; padding:5px 10px; border-radius:3px; cursor:pointer;">
-        ✕ Cerrar
+        ✕
       </button>
     </div>
   </div>
-  
-  <!-- Lista de archivos disponibles -->
-  <div id="lista-archivos-disponibles" style="max-height:400px; overflow-y:auto; background:white;">
-    <p style="color:#999; padding:10px; text-align:center;">Cargando archivos...</p>
+  <div id="lista-archivos-cargados" style="max-height:300px; overflow-y:auto; background:white;">
+    <p style="color:#999; padding:10px;">No hay archivos cargados</p>
   </div>
 </div>
 
-<button id="btn-toggle-panel" onclick="togglePanelArchivos()" style="position:absolute; top:60px; left:220px; z-index:999; background:#0056b3; color:white; border:none; padding:10px 15px; border-radius:5px; cursor:pointer; box-shadow:0 2px 4px rgba(0,0,0,0.2);">
+<button id="btn-toggle-panel" onclick="togglePanelArchivos()" style="position:absolute; top:60px; left:10px; z-index:999; background:#0056b3; color:white; border:none; padding:10px 15px; border-radius:5px; cursor:pointer; box-shadow:0 2px 4px rgba(0,0,0,0.2);">
   📁 Archivos (<span id="contador-archivos-btn">0</span>)
 </button>
 
@@ -743,40 +727,9 @@ tr.seleccionado { background-color:#FFFF99 !important; }
       <span id="nombreTIFF" style="display:none; margin-left:10px; color:#333; font-weight:bold;"></span>
       
       <div id="menu-grabar" class="menu-grabar">
+        <div id="opcion-grabar">💾 Guardar cambios</div>
         <div id="opcion-grabar-como">📝 Guardar como...</div>
-        <div id="opcion-grabar-archivos">💾 Guardar archivos abiertos</div>
       </div>
-    </div>
-  </div>
-</div>
-
-<!-- Modal para seleccionar archivos a guardar -->
-<div id="modal-seleccionar-archivos" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:10000; align-items:center; justify-content:center;">
-  <div style="background:white; padding:20px; border-radius:10px; max-width:500px; width:90%; max-height:80vh; overflow:auto; box-shadow:0 4px 20px rgba(0,0,0,0.3);">
-    <h3 style="margin:0 0 20px 0; color:#333; border-bottom:2px solid #007bff; padding-bottom:10px;">
-      💾 Seleccionar archivos a guardar
-    </h3>
-    
-    <div style="margin-bottom:20px;">
-      <button id="btn-seleccionar-todos" style="padding:8px 15px; background:#28a745; color:white; border:none; border-radius:5px; cursor:pointer; margin-right:10px;">
-        ✅ Seleccionar todos
-      </button>
-      <button id="btn-deseleccionar-todos" style="padding:8px 15px; background:#6c757d; color:white; border:none; border-radius:5px; cursor:pointer;">
-        ❌ Deseleccionar todos
-      </button>
-    </div>
-    
-    <div id="lista-archivos-guardar" style="max-height:400px; overflow-y:auto; border:1px solid #ddd; border-radius:5px; padding:10px; margin-bottom:20px;">
-      <!-- Se llenará dinámicamente con JavaScript -->
-    </div>
-    
-    <div style="text-align:right; border-top:1px solid #ddd; padding-top:15px;">
-      <button id="btn-cancelar-modal" style="padding:10px 20px; background:#6c757d; color:white; border:none; border-radius:5px; cursor:pointer; margin-right:10px;">
-        ❌ Cancelar
-      </button>
-      <button id="btn-confirmar-guardar" style="padding:10px 20px; background:#007bff; color:white; border:none; border-radius:5px; cursor:pointer; font-weight:bold;">
-        💾 Guardar seleccionados
-      </button>
     </div>
   </div>
 </div>
@@ -789,32 +742,21 @@ tr.seleccionado { background-color:#FFFF99 !important; }
 <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
 
 <script>
-// === VARIABLE GLOBAL PARA EL MAPA ===
-let map;
-
-// === VARIABLES GLOBALES PARA SELECTOR DE ARCHIVOS ===
-let archivosDisponibles = [];
-let archivosAbiertos = {};
-let poligonosTodos = [];
-let leafletPoligonos = [];
-const seleccionados = new Set();
-const coloresPorDefecto = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E2'];
-
-// Variables que se inicializan con datos del backend
-let esUsuarioDSUBICI = false;
-
 // Esperar a que TODO se cargue (incluido Leaflet)
 window.onload = function() {
 console.log('✅ Página cargada - Iniciando MAppEAR');
 
-// === VARIABLES LOCALES ===
+// === VARIABLES PARA MÚLTIPLES ARCHIVOS ===
 const archivosCargados = {};
+let poligonosTodos = [];
+const coloresPorDefecto = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E2'];
 
 const poligonos = {{ poligonos|tojson }};
-esUsuarioDSUBICI = "{{ usuario }}" === "DSUBICI";
+const leafletPoligonos = [];
+const seleccionados = new Set();
+const esUsuarioDSUBICI = "{{ usuario }}" === "DSUBICI";
 
-// Declarar map como variable GLOBAL (sin const)
-map = L.map('map').setView([-35, -63], 8);
+const map = L.map('map').setView([-35, -63], 8);
 
 // === CAPAS DE MAPA (disponibles para TODOS los usuarios) ===
 // Capa de calles (OpenStreetMap)
@@ -1047,12 +989,6 @@ poligonos.forEach((p, idx)=>{
     const poly = L.polygon(p.coords,{color:"#000000",weight:0.5,fillColor:fillColor,fillOpacity:opacidad})
       .addTo(map);
     poly.index = idx;
-    
-    // IMPORTANTE: Guardar referencia bidireccional
-    p.leafletPolygon = poly;
-    
-    // IMPORTANTE: Agregar a array global
-    poligonosTodos.push(p);
     
     // Variable para controlar si se acaba de hacer click
     let clickReciente = false;
@@ -2237,12 +2173,7 @@ function sortSelectedOptimized(colIdx, ascending) {
                     if(row) {
                         row.classList.add('seleccionado');
                         row.querySelector('.selectFila').checked = true;
-                        if(leafletPoligonos[idx]) {
-                          leafletPoligonos[idx].setStyle({
-                            weight: 2,
-                            color: '#000000'
-                          });
-                        }
+                        if(leafletPoligonos[idx]) leafletPoligonos[idx].setStyle({weight:2});
                     }
                 });
                 
@@ -2273,8 +2204,31 @@ function sortSelectedOptimized(colIdx, ascending) {
     }, 50);
 }
 
-// Funciones ya movidas fuera de window.onload (ver línea ~2576)
-// getFilaIndex, toggleSeleccion, scrollFila están disponibles globalmente
+function getFilaIndex(row) {
+  return parseInt(row.getAttribute('data-index'));
+}
+
+function toggleSeleccion(idx){
+  const fila = document.querySelector(`#tablaPoligonos tbody tr[data-index="${idx}"]`);
+  const checkbox = fila.querySelector('input.selectFila');
+  
+  if(seleccionados.has(idx)){
+    seleccionados.delete(idx);
+    fila.classList.remove('seleccionado');
+    checkbox.checked = false;
+    if(leafletPoligonos[idx]) leafletPoligonos[idx].setStyle({weight:0.5});
+  } else {
+    seleccionados.add(idx);
+    fila.classList.add('seleccionado');
+    checkbox.checked = true;
+    if(leafletPoligonos[idx]) leafletPoligonos[idx].setStyle({weight:2});
+  }
+}
+
+function scrollFila(idx){
+  const fila = document.querySelector(`#tablaPoligonos tbody tr[data-index="${idx}"]`);
+  if(fila) fila.scrollIntoView({behavior:"smooth", block:"center"});
+}
 
 document.querySelector('#tablaPoligonos tbody').addEventListener('click', function(e){
   if(e.target.tagName === 'INPUT') return;
@@ -2482,8 +2436,6 @@ function obtenerDatos(){
   return filas;
 }
 
-// DESHABILITADO - Ya no se usa esta opción
-/*
 document.getElementById('opcion-grabar').addEventListener('click',()=>{
   console.log('💾 ========== GUARDANDO ARCHIVO ==========');
   const datosAGuardar = obtenerDatos();
@@ -2512,7 +2464,6 @@ document.getElementById('opcion-grabar').addEventListener('click',()=>{
   
   document.getElementById('menu-grabar').style.display = 'none';
 });
-*/
 
 document.getElementById('opcion-grabar-como').addEventListener('click', async ()=>{
   const fecha = new Date();
@@ -2547,15 +2498,6 @@ document.getElementById('opcion-grabar-como').addEventListener('click', async ()
     mostrarToast('Error de conexión', 'No se pudo guardar el archivo', 'error');
   }
   document.getElementById('menu-grabar').style.display = 'none';
-});
-
-// Nueva opción: Guardar archivos abiertos (para sistema de múltiples archivos)
-document.getElementById('opcion-grabar-archivos').addEventListener('click', ()=>{
-  console.log('💾 Mostrar modal de selección de archivos');
-  document.getElementById('menu-grabar').style.display = 'none';
-  
-  // Mostrar modal de selección
-  mostrarModalSeleccionArchivos();
 });
 
 document.getElementById('exportarPDF').addEventListener('click',()=>{
@@ -2612,322 +2554,47 @@ document.getElementById("btnLimpiar").addEventListener("click", function() {
 
 console.log('✅ MAppEAR inicializado correctamente');
 
-}; // Fin de window.onload
+// === FUNCIONES PARA MÚLTIPLES ARCHIVOS ===
 
-// ========================================================================
-// === FUNCIONES GLOBALES CRÍTICAS (Accesibles desde eventos) ===
-// ========================================================================
-
-function getFilaIndex(row) {
-  return parseInt(row.getAttribute('data-index'));
-}
-
-function toggleSeleccion(idx){
-  const fila = document.querySelector(`#tablaPoligonos tbody tr[data-index="${idx}"]`);
-  if (!fila) {
-    console.error(`❌ No se encontró fila con índice ${idx}`);
-    return;
+async function cargarArchivoAdicional(file) {
+  console.log(`📂 Cargando: ${file.name}`);
+  
+  if (archivosCargados[file.name]) {
+    mostrarToast('Duplicado', `${file.name} ya está cargado`, 'warning');
+    return false;
   }
   
-  const checkbox = fila.querySelector('input.selectFila');
-  
-  if(seleccionados.has(idx)){
-    seleccionados.delete(idx);
-    fila.classList.remove('seleccionado');
-    if (checkbox) checkbox.checked = false;
-    if(leafletPoligonos[idx]) {
-      leafletPoligonos[idx].setStyle({
-        weight: 0.5,
-        color: '#000000'
-      });
-    }
-    console.log(`➖ Deseleccionado polígono ${idx}`);
-  } else {
-    seleccionados.add(idx);
-    fila.classList.add('seleccionado');
-    if (checkbox) checkbox.checked = true;
-    if(leafletPoligonos[idx]) {
-      leafletPoligonos[idx].setStyle({
-        weight: 2,
-        color: '#000000'  // Negro para selección
-      });
-    }
-    console.log(`✅ Seleccionado polígono ${idx}`);
-  }
-}
-
-function scrollFila(idx){
-  const fila = document.querySelector(`#tablaPoligonos tbody tr[data-index="${idx}"]`);
-  if(fila) {
-    fila.scrollIntoView({behavior:"smooth", block:"center"});
-    console.log(`📜 Scroll a fila ${idx}`);
-  } else {
-    console.error(`❌ No se encontró fila ${idx} para scroll`);
-  }
-}
-
-function mostrarMensaje(titulo, mensaje, tipo) {
-  console.log(`[${tipo}] ${titulo}: ${mensaje}`);
-  
-  // Crear toast visual
-  const toast = document.createElement('div');
-  toast.className = `toast toast-${tipo}`;
-  toast.style.cssText = `
-    position: fixed;
-    bottom: 20px;
-    right: -250px;
-    width: 200px;
-    height: 150px;
-    background: #007BFF;
-    color: white;
-    padding: 12px 15px;
-    border-radius: 5px;
-    box-shadow: 0 3px 10px rgba(0,0,0,0.25);
-    z-index: 10000;
-    text-transform: uppercase;
-    font-weight: 700;
-    text-align: center;
-    font-family: Tahoma, Geneva, sans-serif;
-    font-size: 18px;
-    letter-spacing: 0.5px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-direction: column;
-    animation: slideInFromRight 0.4s ease-out forwards;
-  `;
-  
-  const textoMayusculas = `<strong>${titulo}</strong><br>${mensaje}`.toUpperCase();
-  toast.innerHTML = textoMayusculas;
-  document.body.appendChild(toast);
-  
-  setTimeout(() => {
-    toast.style.animation = 'slideOutToRight 0.4s ease-in forwards';
-    setTimeout(() => toast.remove(), 400);
-  }, 3000);
-}
-
-function regenerarFiltroColores() {
-  console.log('🎨 Regenerando filtro de colores...');
-  
-  const filtroColor = document.getElementById('filtroColor');
-  if (!filtroColor) return;
-  
-  // Obtener colores únicos
-  const coloresUnicos = new Set();
-  document.querySelectorAll('input.colorInput').forEach(input => {
-    if (input.value) coloresUnicos.add(input.value.toUpperCase());
-  });
-  
-  // Limpiar y regenerar opciones
-  filtroColor.innerHTML = '<option value="">Todos los colores</option>';
-  Array.from(coloresUnicos).sort().forEach(color => {
-    const option = document.createElement('option');
-    option.value = color;
-    option.textContent = color;
-    option.style.backgroundColor = color;
-    filtroColor.appendChild(option);
-  });
-  
-  console.log(`✅ Filtro regenerado con ${coloresUnicos.size} colores`);
-}
-
-// ========================================================================
-// === FIN FUNCIONES GLOBALES CRÍTICAS ===
-// ========================================================================
-
-// === FUNCIONES CORREGIDAS PARA SELECTOR DE ARCHIVOS ===
-
-// Función auxiliar para mostrar mensajes (si no existe)
-function mostrarToast(titulo, mensaje, tipo) {
-  console.log(`[${tipo.toUpperCase()}] ${titulo}: ${mensaje}`);
-  
-  // Intentar usar la función global si existe
-  if (window.mostrarMensaje) {
-    window.mostrarMensaje(mensaje, tipo);
-  } else {
-    // Fallback a alert para errores críticos
-    if (tipo === 'error') {
-      alert(`${titulo}: ${mensaje}`);
-    }
-  }
-}
-
-// Cargar lista de archivos disponibles
-async function cargarListaArchivos() {
-  console.log('📂 Cargando lista de archivos...');
-  
-  try {
-    const response = await fetch('/listar_archivos_disponibles');
-    
-    console.log('📂 Status:', response.status, response.statusText);
-    
-    if (!response.ok) {
-      if (response.status === 401) {
-        mostrarToast('Error', 'Sesión expirada. Por favor, vuelve a iniciar sesión.', 'error');
-        setTimeout(() => {
-          window.location.href = '/';
-        }, 2000);
-        return;
-      }
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-    }
-    
-    const data = await response.json();
-    
-    console.log('📂 Respuesta del servidor:', data);
-    
-    if (data.success) {
-      archivosDisponibles = data.archivos;
-      console.log('✅ Archivos disponibles:', archivosDisponibles);
-      
-      if (archivosDisponibles.length === 0) {
-        console.log('⚠️ No hay archivos .xlsx en la carpeta');
-        mostrarToast('Sin archivos', 'No hay archivos .xlsx disponibles. Sube archivos a tu carpeta.', 'warning');
-      }
-      
-      mostrarListaArchivosDisponibles();
-    } else {
-      console.error('❌ Error del servidor:', data.mensaje);
-      mostrarToast('Error', data.mensaje, 'error');
-    }
-  } catch (error) {
-    console.error('❌ Error cargando lista:', error);
-    mostrarToast('Error', `No se pudo cargar la lista: ${error.message}`, 'error');
-  }
-}
-
-// Mostrar lista de archivos disponibles
-function mostrarListaArchivosDisponibles() {
-  console.log('📋 Mostrando lista de archivos disponibles');
-  
-  const contenedor = document.getElementById('lista-archivos-disponibles');
-  if (!contenedor) {
-    console.error('❌ No se encontró el contenedor lista-archivos-disponibles');
-    return;
-  }
-  
-  contenedor.innerHTML = '';
-  
-  if (archivosDisponibles.length === 0) {
-    contenedor.innerHTML = '<p style="color:#999; padding:10px; text-align:center;">No hay archivos en la carpeta</p>';
-    return;
-  }
-  
-  console.log('📋 Generando HTML para', archivosDisponibles.length, 'archivos');
-  
-  archivosDisponibles.forEach((nombreArchivo, idx) => {
-    const estaAbierto = archivosAbiertos[nombreArchivo] !== undefined;
-    const color = coloresPorDefecto[idx % coloresPorDefecto.length];
-    
-    const div = document.createElement('div');
-    div.className = 'archivo-disponible-item';
-    div.style.cssText = `
-      padding: 12px;
-      border-bottom: 1px solid #e0e0e0;
-      cursor: pointer;
-      transition: background 0.2s;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    `;
-    
-    div.innerHTML = `
-      <div style="display:flex; align-items:center; flex:1;">
-        <input type="checkbox" ${estaAbierto ? 'checked' : ''} 
-               onchange="toggleArchivo('${nombreArchivo}')" 
-               style="margin-right:10px; cursor:pointer;">
-        <div style="width:12px; height:12px; background:${color}; margin-right:8px; border-radius:2px;"></div>
-        <span style="flex:1; font-size:13px;">${nombreArchivo}</span>
-        ${estaAbierto ? '<span style="color:#28a745; font-weight:bold; margin-right:8px;">✓ Abierto</span>' : ''}
-        ${estaAbierto && archivosAbiertos[nombreArchivo].modificado ? '<span style="color:#ff6b6b; font-weight:bold;">●</span>' : ''}
-      </div>
-      <div style="display:flex; gap:4px;">
-        ${estaAbierto ? `
-          <button onclick="event.stopPropagation(); toggleVisibilidad('${nombreArchivo}')" 
-                  style="background:#17a2b8; color:white; border:none; padding:4px 8px; border-radius:3px; cursor:pointer; font-size:11px;" 
-                  title="Mostrar/Ocultar">
-            ${archivosAbiertos[nombreArchivo].visible ? '👁️' : '👁️‍🗨️'}
-          </button>
-        ` : ''}
-        <span style="color:#666; font-size:11px; padding:4px 8px;">${estaAbierto ? archivosAbiertos[nombreArchivo].poligonos.length + 'p' : ''}</span>
-      </div>
-    `;
-    
-    div.onmouseover = () => div.style.background = '#f5f5f5';
-    div.onmouseout = () => div.style.background = 'white';
-    
-    contenedor.appendChild(div);
-  });
-  
-  console.log('✅ Lista HTML generada');
-}
-
-// Toggle abrir/cerrar archivo
-async function toggleArchivo(nombreArchivo) {
-  console.log('🔄 Toggle archivo:', nombreArchivo);
-  
-  if (archivosAbiertos[nombreArchivo]) {
-    console.log('📁 Archivo está abierto, procediendo a cerrar');
-    cerrarArchivo(nombreArchivo);
-  } else {
-    console.log('📁 Archivo está cerrado, procediendo a abrir');
-    await abrirArchivo(nombreArchivo);
-  }
-}
-
-// Abrir archivo
-async function abrirArchivo(nombreArchivo) {
-  console.log('📂 Abriendo archivo:', nombreArchivo);
-  mostrarToast('Cargando...', nombreArchivo, 'info');
+  mostrarToast('Cargando...', file.name, 'info');
   
   try {
     const formData = new FormData();
-    formData.append('nombre_archivo', nombreArchivo);
+    formData.append('archivo', file);
     
-    console.log('📤 Enviando petición a /cargar_archivo_desde_carpeta');
-    
-    const response = await fetch('/cargar_archivo_desde_carpeta', {
+    const response = await fetch('/cargar_archivo_adicional', {
       method: 'POST',
       body: formData
     });
     
-    console.log('📥 Respuesta recibida:', response.status);
-    
     const data = await response.json();
-    console.log('📥 Datos recibidos:', data.total, 'polígonos');
     
     if (!data.success) {
-      console.error('❌ Error del servidor:', data.mensaje);
       mostrarToast('Error', data.mensaje, 'error');
-      return;
+      return false;
     }
     
-    const idx = archivosDisponibles.indexOf(nombreArchivo);
-    const colorArchivo = coloresPorDefecto[idx % coloresPorDefecto.length];
+    const color = coloresPorDefecto[Object.keys(archivosCargados).length % coloresPorDefecto.length];
     
-    console.log('✅ Archivo cargado:', data.poligonos.length, 'polígonos');
-    
-    archivosAbiertos[nombreArchivo] = {
-      nombre: nombreArchivo,
+    archivosCargados[file.name] = {
+      nombre: file.name,
       poligonos: data.poligonos,
       modificado: false,
-      color: colorArchivo,
+      color: color,
       visible: true
     };
     
-    console.log('🗺️ Dibujando polígonos CON EVENTOS COMPLETOS...');
+    poligonosTodos = poligonosTodos.concat(data.poligonos);
     
-    // Verificar que map existe
-    if (typeof map === 'undefined') {
-      console.error('❌ ERROR CRÍTICO: Variable "map" no está definida');
-      alert('Error: El mapa no está inicializado. Refresca la página.');
-      return;
-    }
-    
-    // Dibujar polígonos con EVENTOS COMPLETOS
-    let poligonosDibujados = 0;
-    data.poligonos.forEach((pol, indexEnArchivo) => {
+    data.poligonos.forEach(pol => {
       if (pol.geometry && pol.geometry.trim()) {
         const coords = [];
         pol.geometry.trim().split(/\s+/).forEach(p => {
@@ -2938,546 +2605,119 @@ async function abrirArchivo(nombreArchivo) {
         });
         
         if (coords.length >= 3) {
-          try {
-            // Determinar color y opacidad
-            const colorLower = pol.color ? pol.color.toLowerCase() : '';
-            const esTransparente = (colorLower === 'transparent');
-            let opacidad = esTransparente ? 0 : (parseFloat(pol.opacity) || 0.3);
-            const fillColor = esTransparente ? '#000000' : (pol.color || colorArchivo);
-            
-            // Crear polígono con estilo original
-            const polygon = L.polygon(coords, {
-              color: "#000000",
-              weight: 0.5,
-              fillColor: fillColor,
-              fillOpacity: opacidad
-            }).addTo(map);
-            
-            // Guardar índice global ANTES de agregar a arrays
-            const indexGlobal = poligonosTodos.length;
-            polygon.index = indexGlobal;
-            pol.leafletPolygon = polygon;
-            
-            // === EVENTOS COMPLETOS (IGUAL QUE SISTEMA ORIGINAL) ===
-            
-            let clickReciente = false;
-            
-            // EVENTO MOUSEOVER (hover)
-            polygon.on('mouseover', function(e) {
-              try {
-                const layer = e.target;
-                
-                if (clickReciente) return;
-                
-                // Solo resaltar si NO está seleccionado
-                if (!seleccionados.has(indexGlobal)) {
-                  layer.setStyle({
-                    weight: 2,
-                    color: '#000000'
-                  });
-                  layer.bringToFront();
-                }
-                
-                // Obtener nombre y superficie del polígono
-                let nombre = 'Polígono';
-                let superficie = '';
-                for (const [key, val] of pol.STATUS || []) {
-                  const keyLower = key.toLowerCase();
-                  if (keyLower === 'name' || keyLower === 'nombre') {
-                    nombre = val || nombre;
-                  }
-                  if (keyLower === 'superficie' || keyLower === 'hectareas' || keyLower === 'has') {
-                    superficie = val ? ` | ${val} has` : '';
-                  }
-                }
-                
-                // Mostrar tooltip
-                const tooltipContent = `<strong>${nombre}</strong>${superficie}`;
-                layer.bindTooltip(tooltipContent, {
-                  permanent: false,
-                  direction: 'top',
-                  className: 'tooltip-poligono',
-                  opacity: 0.95,
-                  offset: [0, -10]
-                }).openTooltip();
-                
-              } catch (error) {
-                console.error('Error en hover:', error);
-              }
-            });
-            
-            // EVENTO MOUSEOUT
-            polygon.on('mouseout', function(e) {
-              try {
-                const layer = e.target;
-                // Solo restaurar si NO está seleccionado
-                if (!seleccionados.has(indexGlobal)) {
-                  layer.setStyle({
-                    weight: 0.5,
-                    color: '#000000'
-                  });
-                }
-                layer.closeTooltip();
-              } catch (error) {
-                console.error('Error en mouseout:', error);
-              }
-            });
-            
-            // EVENTO CLICK (selección)
-            polygon.on('click', (e) => {
-              try {
-                const layer = e.target;
-                
-                // Cerrar tooltip al hacer click
-                layer.closeTooltip();
-                
-                // Marcar que se hizo click recientemente
-                clickReciente = true;
-                setTimeout(() => {
-                  clickReciente = false;
-                }, 300);
-                
-                // Toggle selección
-                toggleSeleccion(indexGlobal);
-                scrollFila(indexGlobal);
-                
-                // Resaltar campo nombre si es admin
-                if (esUsuarioDSUBICI) {
-                  setTimeout(() => {
-                    const fila = document.querySelector(`#tablaPoligonos tbody tr[data-index="${indexGlobal}"]`);
-                    if (fila) {
-                      const inputNombre = fila.querySelectorAll('input[type="text"]')[0];
-                      if (inputNombre) {
-                        inputNombre.focus();
-                        if (inputNombre.value && inputNombre.value.trim() !== '') {
-                          inputNombre.select();
-                        }
-                        
-                        const estiloOriginalBg = inputNombre.style.backgroundColor;
-                        const estiloOriginalBorder = inputNombre.style.border;
-                        
-                        inputNombre.style.backgroundColor = '#fff3cd';
-                        inputNombre.style.border = '2px solid #ffc107';
-                        inputNombre.style.transition = 'all 0.2s ease';
-                        
-                        setTimeout(() => {
-                          inputNombre.style.backgroundColor = estiloOriginalBg;
-                          inputNombre.style.border = estiloOriginalBorder;
-                        }, 500);
-                      }
-                    }
-                  }, 100);
-                }
-                
-              } catch (error) {
-                console.error('Error en click:', error);
-              }
-            });
-            
-            // Agregar a arrays globales
-            poligonosTodos.push(pol);
-            leafletPoligonos.push(polygon);
-            
-            poligonosDibujados++;
-            
-          } catch (error) {
-            console.error('❌ Error dibujando polígono:', error);
+          const polygon = L.polygon(coords, {
+            color: pol.color || color,
+            fillColor: pol.color || color,
+            fillOpacity: parseFloat(pol.opacity) || 0.3,
+            weight: 2
+          }).addTo(map);
+          
+          pol.leafletPolygon = polygon;
+          
+          let nombre = 'Polígono';
+          for (const [key, val] of pol.STATUS || []) {
+            if (key.toLowerCase() === 'name' || key.toLowerCase() === 'nombre') {
+              nombre = val || nombre;
+              break;
+            }
           }
+          polygon.bindTooltip(nombre, {permanent: false, direction: 'center'});
         }
       }
     });
     
-    console.log('✅ Polígonos dibujados:', poligonosDibujados, 'con eventos completos');
-    
-    mostrarListaArchivosDisponibles();
+    actualizarListaArchivos();
     actualizarContadores();
-    actualizarTablaPoligonos();
-    mostrarToast('Abierto', `${nombreArchivo}: ${data.poligonos.length} polígonos`, 'success');
-    
+    mostrarToast('Cargado', `${file.name}: ${data.poligonos.length} polígonos`, 'success');
+    return true;
   } catch (error) {
-    console.error('❌ Error abriendo archivo:', error);
-    mostrarToast('Error', 'No se pudo abrir el archivo: ' + error.message, 'error');
+    console.error('Error:', error);
+    mostrarToast('Error', `No se pudo cargar ${file.name}`, 'error');
+    return false;
   }
 }
 
-// Cerrar archivo
-function cerrarArchivo(nombreArchivo) {
-  console.log('📁 Cerrando archivo:', nombreArchivo);
+function actualizarListaArchivos() {
+  const contenedor = document.getElementById('lista-archivos-cargados');
+  if (!contenedor) return;
   
-  const archivo = archivosAbiertos[nombreArchivo];
-  if (!archivo) {
-    console.error('❌ Archivo no encontrado en archivosAbiertos');
-    return;
-  }
-  
-  if (archivo.modificado) {
-    if (!confirm(`${nombreArchivo} tiene cambios sin guardar. ¿Cerrar de todos modos?`)) {
-      console.log('⚠️ Usuario canceló cerrar archivo');
-      mostrarListaArchivosDisponibles(); // Refrescar para volver checkbox a checked
-      return;
-    }
-  }
-  
-  console.log('🗑️ Removiendo', archivo.poligonos.length, 'polígonos del mapa');
-  
-  // PASO 1: Identificar índices a eliminar
-  const indicesAEliminar = [];
-  poligonosTodos.forEach((pol, idx) => {
-    if (pol.archivo_origen === nombreArchivo) {
-      indicesAEliminar.push(idx);
-    }
-  });
-  
-  console.log('📊 Índices a eliminar:', indicesAEliminar);
-  
-  // PASO 2: Eliminar del mapa y de arrays (en orden inverso)
-  indicesAEliminar.reverse().forEach(idx => {
-    // Remover del mapa
-    if (leafletPoligonos[idx]) {
-      map.removeLayer(leafletPoligonos[idx]);
-    }
-    
-    // Remover del Set de seleccionados si estaba
-    seleccionados.delete(idx);
-    
-    // Eliminar de arrays
-    poligonosTodos.splice(idx, 1);
-    leafletPoligonos.splice(idx, 1);
-  });
-  
-  // PASO 3: REINDEXAR todos los polígonos restantes
-  console.log('🔄 Reindexando polígonos restantes...');
-  poligonosTodos.forEach((pol, nuevoIdx) => {
-    if (pol.leafletPolygon) {
-      pol.leafletPolygon.index = nuevoIdx;
-    }
-  });
-  
-  // PASO 4: Actualizar Set de seleccionados con nuevos índices
-  const nuevosSeleccionados = new Set();
-  seleccionados.forEach(oldIdx => {
-    // Los índices mayores al eliminado se reducen en 1 por cada eliminación
-    let nuevoIdx = oldIdx;
-    indicesAEliminar.forEach(eliminado => {
-      if (oldIdx > eliminado) nuevoIdx--;
-    });
-    if (nuevoIdx >= 0 && nuevoIdx < poligonosTodos.length) {
-      nuevosSeleccionados.add(nuevoIdx);
-    }
-  });
-  seleccionados.clear();
-  nuevosSeleccionados.forEach(idx => seleccionados.add(idx));
-  
-  // PASO 5: Remover de archivos abiertos
-  delete archivosAbiertos[nombreArchivo];
-  
-  console.log('✅ Archivo cerrado,', poligonosTodos.length, 'polígonos restantes');
-  
-  mostrarListaArchivosDisponibles();
-  actualizarContadores();
-  actualizarTablaPoligonos(); // Regenerar tabla COMPLETA
-  mostrarToast('Cerrado', nombreArchivo, 'info');
-}
-
-// Toggle visibilidad
-function toggleVisibilidad(nombreArchivo) {
-  console.log('👁️ Toggle visibilidad:', nombreArchivo);
-  
-  const archivo = archivosAbiertos[nombreArchivo];
-  if (!archivo) return;
-  
-  archivo.visible = !archivo.visible;
-  
-  archivo.poligonos.forEach(pol => {
-    if (pol.leafletPolygon) {
-      if (archivo.visible) {
-        pol.leafletPolygon.addTo(map);
-      } else {
-        map.removeLayer(pol.leafletPolygon);
-      }
-    }
-  });
-  
-  console.log('✅ Visibilidad cambiada a:', archivo.visible);
-  mostrarListaArchivosDisponibles();
-}
-
-// ========================================================================
-// === MODAL DE SELECCIÓN DE ARCHIVOS PARA GUARDAR ===
-// ========================================================================
-
-// Mostrar modal con lista de archivos
-function mostrarModalSeleccionArchivos() {
-  console.log('📋 Mostrando modal de selección de archivos');
-  
-  // Sincronizar datos de tabla a memoria primero
-  sincronizarTablaAMemoria();
-  
-  const modal = document.getElementById('modal-seleccionar-archivos');
-  const lista = document.getElementById('lista-archivos-guardar');
-  
-  // Limpiar lista
-  lista.innerHTML = '';
-  
-  // Obtener archivos abiertos
-  const archivos = Object.values(archivosAbiertos);
+  contenedor.innerHTML = '';
+  const archivos = Object.values(archivosCargados);
   
   if (archivos.length === 0) {
-    lista.innerHTML = '<p style="color:#999; text-align:center; padding:20px;">No hay archivos abiertos</p>';
-    modal.style.display = 'flex';
+    contenedor.innerHTML = '<p style="color:#999; padding:10px;">No hay archivos cargados</p>';
     return;
   }
   
-  // Crear checkbox para cada archivo
-  archivos.forEach((archivo, idx) => {
+  archivos.forEach(archivo => {
     const div = document.createElement('div');
-    div.style.cssText = 'padding:10px; margin:5px 0; border:1px solid #ddd; border-radius:5px; display:flex; align-items:center; background:#f9f9f9;';
-    
-    const modificadoBadge = archivo.modificado 
-      ? '<span style="color:#ff6b6b; font-weight:bold; margin-left:10px;">● Modificado</span>' 
-      : '<span style="color:#999; font-size:11px; margin-left:10px;">(Sin cambios)</span>';
-    
-    const poligonosCount = archivo.poligonos ? archivo.poligonos.length : 0;
-    
+    div.className = 'archivo-item';
     div.innerHTML = `
-      <input type="checkbox" 
-             id="checkbox-archivo-${idx}" 
-             data-archivo="${archivo.nombre}" 
-             ${archivo.modificado ? 'checked' : ''}
-             style="width:20px; height:20px; margin-right:10px; cursor:pointer;">
-      <label for="checkbox-archivo-${idx}" style="flex:1; cursor:pointer; user-select:none;">
-        <strong style="color:#333;">${archivo.nombre}</strong>
-        ${modificadoBadge}
-        <br>
-        <span style="color:#666; font-size:11px;">${poligonosCount} polígonos</span>
-      </label>
+      <div style="display:flex; align-items:center; padding:8px;">
+        <div style="width:12px; height:12px; background:${archivo.color}; margin-right:8px; border-radius:2px;"></div>
+        <span style="flex:1; font-size:13px;">${archivo.nombre}</span>
+        <span class="modificado-indicator" style="display:${archivo.modificado ? 'inline' : 'none'}; margin-right:8px;">●</span>
+        <span style="color:#666; margin-right:8px; font-size:12px;">${archivo.poligonos.length}p</span>
+        <button onclick="toggleVisibilidadArchivo('${archivo.nombre}')" title="Mostrar/Ocultar">
+          ${archivo.visible ? '👁️' : '👁️‍🗨️'}
+        </button>
+        <button onclick="guardarArchivoEspecifico('${archivo.nombre}')" title="Guardar">💾</button>
+        <button onclick="removerArchivo('${archivo.nombre}')" title="Remover">❌</button>
+      </div>
     `;
-    
-    lista.appendChild(div);
-  });
-  
-  // Mostrar modal
-  modal.style.display = 'flex';
-  
-  console.log('✅ Modal mostrado con', archivos.length, 'archivos');
-}
-
-// Cerrar modal
-function cerrarModalSeleccion() {
-  document.getElementById('modal-seleccionar-archivos').style.display = 'none';
-}
-
-// Seleccionar todos los checkboxes
-function seleccionarTodosArchivos() {
-  document.querySelectorAll('#lista-archivos-guardar input[type="checkbox"]').forEach(cb => {
-    cb.checked = true;
+    contenedor.appendChild(div);
   });
 }
 
-// Deseleccionar todos los checkboxes
-function deseleccionarTodosArchivos() {
-  document.querySelectorAll('#lista-archivos-guardar input[type="checkbox"]').forEach(cb => {
-    cb.checked = false;
-  });
-}
-
-// Guardar archivos seleccionados
-async function guardarArchivosSeleccionados() {
-  console.log('💾 Guardando archivos seleccionados...');
+async function guardarArchivoEspecifico(nombreArchivo) {
+  const archivo = archivosCargados[nombreArchivo];
+  if (!archivo) return;
   
-  // Obtener checkboxes marcados
-  const checkboxes = document.querySelectorAll('#lista-archivos-guardar input[type="checkbox"]:checked');
-  
-  if (checkboxes.length === 0) {
-    mostrarToast('Sin selección', 'No has seleccionado ningún archivo para guardar', 'warning');
+  if (!archivo.modificado) {
+    mostrarToast('Sin cambios', nombreArchivo, 'info');
     return;
   }
   
-  const nombresSeleccionados = Array.from(checkboxes).map(cb => cb.getAttribute('data-archivo'));
+  if (!confirm(`¿Guardar ${nombreArchivo}?`)) return;
   
-  console.log('📂 Archivos seleccionados:', nombresSeleccionados);
+  mostrarToast('Guardando...', nombreArchivo, 'info');
   
-  // Cerrar modal
-  cerrarModalSeleccion();
-  
-  // Confirmar
-  if (!confirm(`¿Guardar ${nombresSeleccionados.length} archivo(s)?\n\n${nombresSeleccionados.join('\n')}`)) {
-    return;
-  }
-  
-  let guardados = 0;
-  let errores = 0;
-  
-  for (const nombreArchivo of nombresSeleccionados) {
-    try {
-      console.log('💾 ========== GUARDANDO:', nombreArchivo, '==========');
-      
-      // Usar obtenerDatos() estilo ORIGINAL
-      const tbody = document.querySelector('#tablaPoligonos tbody');
-      const filas = Array.from(tbody.querySelectorAll('tr[data-index]'));
-      
-      const datosArchivo = [];
-      let contadorTransparentes = 0;
-      
-      filas.forEach(tr => {
-        const idx = parseInt(tr.getAttribute('data-index'));
-        const pol = poligonosTodos[idx];
-        
-        // Solo procesar polígonos de este archivo
-        if (pol && pol.archivo_origen === nombreArchivo) {
-          const inputs = tr.querySelectorAll('input');
-          
-          // Extraer coordenadas del polígono Leaflet (IGUAL QUE ORIGINAL)
-          let coords = '';
-          if (leafletPoligonos[idx]) {
-            coords = leafletPoligonos[idx].getLatLngs()[0].map(p => `${p.lng},${p.lat}`).join(" ");
-          }
-          
-          // Detectar si es transparente (IGUAL QUE ORIGINAL)
-          const colorInput = inputs[8];
-          const esTransparente = colorInput.getAttribute('data-transparent') === 'true';
-          const colorGuardar = esTransparente ? 'transparent' : colorInput.value;
-          
-          // Obtener opacidad actual del polígono en el mapa
-          let opacidad = 0.6;
-          if (leafletPoligonos[idx]) {
-            opacidad = leafletPoligonos[idx].options.fillOpacity || 0.6;
-          }
-          
-          if (esTransparente) {
-            contadorTransparentes++;
-            console.log(`🔵 Polígono ${idx} "${inputs[1].value}": TRANSPARENTE`);
-          }
-          
-          // Formato ORIGINAL que guardar_poligonos() espera
-          datosArchivo.push({
-            name: inputs[1].value,
-            superficie: inputs[2].value,
-            status: inputs[3].value,
-            status1: inputs[4].value,
-            status2: inputs[5].value,
-            status3: inputs[6].value,
-            partido: inputs[7].value,
-            color: colorGuardar,
-            colorOriginal: colorGuardar,
-            opacidad: opacidad,
-            COORDENADAS: coords
-          });
-        }
-      });
-      
-      console.log(`📊 Datos a enviar: ${datosArchivo.length} polígonos (${contadorTransparentes} transparentes)`);
-      
-      if (datosArchivo.length === 0) {
-        console.error('❌ No se encontraron polígonos del archivo:', nombreArchivo);
-        mostrarToast('Error', `No hay polígonos del archivo ${nombreArchivo}`, 'error');
-        errores++;
-        continue;
-      }
-      
-      const response = await fetch('/guardar_archivo_especifico', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-          nombre_archivo: nombreArchivo,
-          datos: datosArchivo
-        })
-      });
-      
-      console.log('📥 Respuesta del servidor:', response.status, response.statusText);
-      
-      const data = await response.json();
-      
-      if (data.success) {
-        const archivo = archivosAbiertos[nombreArchivo];
-        if (archivo) archivo.modificado = false;
-        guardados++;
-        console.log('✅ Guardado:', nombreArchivo);
-      } else {
-        errores++;
-        console.error('❌ Error guardando:', nombreArchivo, data.mensaje);
-        mostrarToast('Error al guardar', `${nombreArchivo}: ${data.mensaje}`, 'error');
-      }
-      
-    } catch (error) {
-      console.error(`❌ Error guardando ${nombreArchivo}:`, error);
-      mostrarToast('Error de red', `No se pudo guardar ${nombreArchivo}`, 'error');
-      errores++;
-    }
-  }
-  
-  // Actualizar UI
-  mostrarListaArchivosDisponibles();
-  
-  // Mostrar resultado
-  if (errores === 0) {
-    mostrarToast('✅ Guardado completo', `${guardados} archivo(s) guardado(s) correctamente`, 'success');
-  } else {
-    mostrarToast('⚠️ Guardado parcial', `${guardados} guardado(s), ${errores} error(es)`, 'warning');
-  }
-}
-
-// Event listeners del modal
-document.getElementById('btn-seleccionar-todos').addEventListener('click', seleccionarTodosArchivos);
-document.getElementById('btn-deseleccionar-todos').addEventListener('click', deseleccionarTodosArchivos);
-document.getElementById('btn-cancelar-modal').addEventListener('click', cerrarModalSeleccion);
-document.getElementById('btn-confirmar-guardar').addEventListener('click', guardarArchivosSeleccionados);
-
-// Cerrar modal al hacer click fuera
-document.getElementById('modal-seleccionar-archivos').addEventListener('click', function(e) {
-  if (e.target === this) {
-    cerrarModalSeleccion();
-  }
-});
-
-// ========================================================================
-// === FIN MODAL DE SELECCIÓN ===
-// ========================================================================
-
-// Guardar todos los archivos abiertos con cambios
-async function guardarTodosLosAbiertos() {
-  console.log('💾 Guardando archivos con cambios...');
-  
-  // IMPORTANTE: Sincronizar datos de la tabla a memoria ANTES de guardar
-  sincronizarTablaAMemoria();
-  
-  let modificados = Object.values(archivosAbiertos).filter(a => a.modificado);
-  
-  console.log('📊 Archivos modificados:', modificados.length);
-  console.log('📊 Archivos abiertos:', Object.keys(archivosAbiertos).length);
-  
-  if (modificados.length === 0) {
-    // Si no hay archivos modificados, preguntar si quiere guardar TODOS
-    const todosLosAbiertos = Object.values(archivosAbiertos);
+  try {
+    const response = await fetch('/guardar_archivo_especifico', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        nombre_archivo: nombreArchivo,
+        poligonos: archivo.poligonos
+      })
+    });
     
-    if (todosLosAbiertos.length === 0) {
-      mostrarToast('Sin archivos', 'No hay archivos abiertos para guardar', 'info');
-      return;
-    }
+    const data = await response.json();
     
-    const respuesta = confirm(`No hay archivos marcados como modificados.\n\n¿Deseas guardar TODOS los archivos abiertos (${todosLosAbiertos.length})?\n\nEsto sobrescribirá los archivos originales con los datos actuales de la tabla.`);
-    
-    if (respuesta) {
-      // Marcar todos como modificados temporalmente
-      modificados = todosLosAbiertos;
-      console.log('✅ Usuario eligió guardar todos los archivos');
+    if (data.success) {
+      archivo.modificado = false;
+      actualizarListaArchivos();
+      mostrarToast('Guardado', nombreArchivo, 'success');
     } else {
-      console.log('❌ Usuario canceló');
-      return;
+      mostrarToast('Error', data.mensaje, 'error');
     }
+  } catch (error) {
+    mostrarToast('Error', 'No se pudo guardar', 'error');
   }
-  
-  if (!confirm(`¿Guardar cambios en ${modificados.length} archivo(s)?`)) {
+}
+
+async function guardarTodosLosArchivos() {
+  const modificados = Object.values(archivosCargados).filter(a => a.modificado);
+  if (modificados.length === 0) {
+    mostrarToast('Sin cambios', 'No hay archivos modificados', 'info');
     return;
   }
   
-  let guardados = 0;
-  let errores = 0;
+  if (!confirm(`¿Guardar ${modificados.length} archivo(s)?`)) return;
   
+  let guardados = 0;
   for (const archivo of modificados) {
     try {
-      console.log('💾 Guardando:', archivo.nombre);
-      
       const response = await fetch('/guardar_archivo_especifico', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
@@ -3488,340 +2728,98 @@ async function guardarTodosLosAbiertos() {
       });
       
       const data = await response.json();
-      
       if (data.success) {
         archivo.modificado = false;
         guardados++;
-        console.log('✅ Guardado:', archivo.nombre);
-      } else {
-        errores++;
-        console.error('❌ Error guardando:', archivo.nombre, data.mensaje);
       }
-      
     } catch (error) {
-      console.error(`❌ Error guardando ${archivo.nombre}:`, error);
-      errores++;
+      console.error(error);
     }
   }
   
-  mostrarListaArchivosDisponibles();
-  
-  if (errores === 0) {
-    mostrarToast('Guardados', `${guardados} archivo(s) guardado(s)`, 'success');
-  } else {
-    mostrarToast('Completado', `${guardados} guardados, ${errores} errores`, 'warning');
-  }
+  actualizarListaArchivos();
+  mostrarToast('Guardados', `${guardados} archivo(s)`, 'success');
 }
 
-// Sincronizar datos de la tabla a la memoria
-function sincronizarTablaAMemoria() {
-  console.log('🔄 ========== SINCRONIZANDO TABLA A MEMORIA ==========');
+function removerArchivo(nombreArchivo) {
+  if (!confirm(`¿Remover ${nombreArchivo}?`)) return;
   
-  const tbody = document.querySelector('#tablaPoligonos tbody');
-  if (!tbody) {
-    console.error('❌ No se encontró tbody');
-    return;
-  }
+  const archivo = archivosCargados[nombreArchivo];
+  if (!archivo) return;
   
-  const filas = tbody.querySelectorAll('tr[data-index]');
-  console.log(`📊 Sincronizando ${filas.length} filas`);
-  
-  let actualizados = 0;
-  
-  filas.forEach((fila, filaIdx) => {
-    const idx = parseInt(fila.getAttribute('data-index'));
-    const pol = poligonosTodos[idx];
-    
-    if (!pol) {
-      console.warn(`⚠️ Fila ${filaIdx}: No se encontró polígono con índice ${idx}`);
-      return;
-    }
-    
-    // Leer TODOS los inputs de la fila
-    const inputs = fila.querySelectorAll('input');
-    
-    // Orden de inputs en la tabla:
-    // [0] = checkbox (ignorar)
-    // [1] = Nombre
-    // [2] = Superficie (Has)
-    // [3] = Status
-    // [4] = Status1
-    // [5] = Status2
-    // [6] = Status3
-    // [7] = Partido
-    // [8] = Color
-    
-    const valoresNuevos = {
-      nombre: inputs[1]?.value || '',
-      superficie: inputs[2]?.value || '',
-      status: inputs[3]?.value || '',
-      status1: inputs[4]?.value || '',
-      status2: inputs[5]?.value || '',
-      status3: inputs[6]?.value || '',
-      partido: inputs[7]?.value || '',
-      color: inputs[8]?.value || '#CCCCCC'
-    };
-    
-    // Log de primera fila para debug
-    if (filaIdx === 0) {
-      console.log('📝 Primera fila - Valores leídos:', valoresNuevos);
-      console.log('📝 Polígono tiene archivo_origen:', pol.archivo_origen);
-    }
-    
-    // Actualizar STATUS array (si existe)
-    if (pol.STATUS && Array.isArray(pol.STATUS)) {
-      // Mapa de nombres de campo normalizados a valores
-      const mapaCampos = {
-        'nombre': valoresNuevos.nombre,
-        'name': valoresNuevos.nombre,
-        'nombre productor': valoresNuevos.nombre,
-        'superficie': valoresNuevos.superficie,
-        'has': valoresNuevos.superficie,
-        'hectareas': valoresNuevos.superficie,
-        'status': valoresNuevos.status,
-        'status1': valoresNuevos.status1,
-        'status2': valoresNuevos.status2,
-        'status3': valoresNuevos.status3,
-        'partido': valoresNuevos.partido,
-        'ptdo': valoresNuevos.partido,
-        'departamento': valoresNuevos.partido
-      };
-      
-      // Actualizar cada campo en el array STATUS
-      pol.STATUS.forEach(([campo, valorViejo], i) => {
-        const campoLower = campo.toLowerCase();
-        
-        if (mapaCampos[campoLower] !== undefined) {
-          pol.STATUS[i] = [campo, mapaCampos[campoLower]];
-          
-          if (filaIdx === 0) {
-            console.log(`  ✏️ Campo "${campo}": "${valorViejo}" → "${mapaCampos[campoLower]}"`);
-          }
-        }
-      });
-      
-    } else {
-      // Si no tiene STATUS array, crear uno
-      console.warn(`⚠️ Polígono ${idx} no tiene STATUS array, creando uno nuevo`);
-      pol.STATUS = [
-        ['NOMBRE', valoresNuevos.nombre],
-        ['SUPERFICIE', valoresNuevos.superficie],
-        ['STATUS', valoresNuevos.status],
-        ['STATUS1', valoresNuevos.status1],
-        ['STATUS2', valoresNuevos.status2],
-        ['STATUS3', valoresNuevos.status3],
-        ['PARTIDO', valoresNuevos.partido]
-      ];
-    }
-    
-    // Actualizar color
-    const colorAnterior = pol.color;
-    pol.color = valoresNuevos.color;
-    
-    if (filaIdx === 0 && colorAnterior !== valoresNuevos.color) {
-      console.log(`  🎨 Color: "${colorAnterior}" → "${valoresNuevos.color}"`);
-    }
-    
-    // CRÍTICO: Extraer coordenadas del polígono de Leaflet si existe
-    if (pol.leafletPolygon) {
-      try {
-        const latlngs = pol.leafletPolygon.getLatLngs()[0];
-        const coordsString = latlngs.map(p => `${p.lng},${p.lat}`).join(" ");
-        pol.geometry = coordsString;
-        
-        if (filaIdx === 0) {
-          console.log(`  📍 Coordenadas extraídas: ${coordsString.substring(0, 50)}...`);
-        }
-      } catch (error) {
-        console.error(`❌ Error extrayendo coordenadas del polígono ${idx}:`, error);
-      }
-    } else if (!pol.geometry) {
-      console.warn(`⚠️ Polígono ${idx} no tiene leafletPolygon ni geometry`);
-    }
-    
-    // Actualizar color en el polígono del mapa
-    if (pol.leafletPolygon) {
-      const esTransparente = inputs[8]?.getAttribute('data-transparent') === 'true';
-      
-      if (esTransparente) {
-        pol.leafletPolygon.setStyle({
-          fillColor: '#000000',
-          fillOpacity: 0
-        });
-      } else {
-        const opacidad = pol.leafletPolygon.options.fillOpacity || 0.6;
-        pol.leafletPolygon.setStyle({
-          fillColor: valoresNuevos.color,
-          fillOpacity: opacidad
-        });
-      }
-    }
-    
-    // IMPORTANTE: Marcar archivo como modificado
-    if (pol.archivo_origen && archivosAbiertos[pol.archivo_origen]) {
-      archivosAbiertos[pol.archivo_origen].modificado = true;
-      
-      if (filaIdx === 0) {
-        console.log(`  ✅ Archivo "${pol.archivo_origen}" marcado como modificado`);
-      }
-    }
-    
-    actualizados++;
+  archivo.poligonos.forEach(pol => {
+    if (pol.leafletPolygon) map.removeLayer(pol.leafletPolygon);
   });
   
-  console.log('✅ Sincronización completada:', actualizados, 'polígonos actualizados');
-  console.log('📊 Archivos modificados:', Object.values(archivosAbiertos).filter(a => a.modificado).map(a => a.nombre));
+  poligonosTodos = poligonosTodos.filter(p => p.archivo_origen !== nombreArchivo);
+  delete archivosCargados[nombreArchivo];
+  
+  actualizarListaArchivos();
+  actualizarContadores();
+  mostrarToast('Removido', nombreArchivo, 'info');
 }
 
-// Actualizar contadores
-function actualizarContadores() {
-  const totalAbiertos = Object.keys(archivosAbiertos).length;
-  const totalPoligonos = poligonosTodos.length;
+function toggleVisibilidadArchivo(nombreArchivo) {
+  const archivo = archivosCargados[nombreArchivo];
+  if (!archivo) return;
   
-  console.log('📊 Actualizando contadores:', totalAbiertos, 'abiertos,', totalPoligonos, 'polígonos');
+  archivo.visible = !archivo.visible;
+  archivo.poligonos.forEach(pol => {
+    if (pol.leafletPolygon) {
+      if (archivo.visible) {
+        pol.leafletPolygon.addTo(map);
+      } else {
+        map.removeLayer(pol.leafletPolygon);
+      }
+    }
+  });
+  
+  actualizarListaArchivos();
+}
+
+function actualizarContadores() {
+  const totalArchivos = Object.keys(archivosCargados).length;
+  const totalPoligonos = poligonosTodos.length;
   
   const contador = document.getElementById('contador-archivos');
   if (contador) {
-    contador.textContent = `${totalAbiertos} abiertos | ${totalPoligonos} polígonos`;
+    contador.textContent = `${totalArchivos} archivos | ${totalPoligonos} polígonos`;
   }
   
   const contadorBtn = document.getElementById('contador-archivos-btn');
   if (contadorBtn) {
-    contadorBtn.textContent = totalAbiertos;
+    contadorBtn.textContent = totalArchivos;
   }
 }
 
-// Actualizar tabla de polígonos (VERSIÓN CORREGIDA)
-function actualizarTablaPoligonos() {
-  console.log('📋 Actualizando tabla de polígonos');
-  
-  const tbody = document.querySelector('#tablaPoligonos tbody');
-  if (!tbody) {
-    console.error('❌ No se encontró tbody de la tabla');
-    return;
-  }
-  
-  // LIMPIAR TABLA COMPLETA
-  tbody.innerHTML = '';
-  
-  console.log('📋 Regenerando tabla con', poligonosTodos.length, 'polígonos');
-  
-  if (poligonosTodos.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="20" style="text-align:center; color:#999; padding:20px;">No hay archivos abiertos. Abre archivos desde el panel 📁</td></tr>';
-    return;
-  }
-  
-  // REGENERAR TODAS LAS FILAS
-  poligonosTodos.forEach((pol, idx) => {
-    const tr = crearFilaTabla(pol, idx);
-    tbody.appendChild(tr);
-  });
-  
-  console.log('✅ Tabla regenerada con', poligonosTodos.length, 'filas');
-}
-
-// Crear fila de tabla para un polígono
-function crearFilaTabla(pol, idx) {
-  const tr = document.createElement('tr');
-  tr.setAttribute('data-index', idx);
-  
-  // Obtener valores de los campos STATUS
-  const campos = {};
-  if (pol.STATUS && Array.isArray(pol.STATUS)) {
-    pol.STATUS.forEach(([campo, valor]) => {
-      campos[campo.toLowerCase()] = valor || '';
-    });
-  }
-  
-  // Log para debug
-  console.log(`📋 Fila ${idx} - Campos disponibles:`, Object.keys(campos));
-  console.log(`📋 Fila ${idx} - Color del polígono: ${pol.color}`);
-  
-  // Obtener valores con múltiples posibles nombres de campo
-  const nombre = campos['nombre'] || campos['name'] || campos['nombre productor'] || ''  ;
-  const superficie = campos['superficie'] || campos['has'] || campos['hectareas'] || '';
-  const status = campos['status'] || '';
-  const status1 = campos['status1'] || '';
-  const status2 = campos['status2'] || '';
-  const status3 = campos['status3'] || '';
-  const partido = campos['partido'] || campos['ptdo'] || campos['departamento'] || '';
-  
-  // Detectar si el color es transparent
-  const colorOriginal = pol.color || campos['color'] || '#CCCCCC';
-  const esTransparente = colorOriginal.toLowerCase() === 'transparent';
-  const colorMostrar = esTransparente ? '#FFFFFF' : colorOriginal;
-  
-  console.log(`📋 Fila ${idx} - Nombre: "${nombre}", Superficie: "${superficie}", Partido: "${partido}", Color: "${colorOriginal}", Transparente: ${esTransparente}"`);
-  
-  // Crear HTML con inputs editables (ORDEN CORRECTO para coincidir con tabla HTML)
-  tr.innerHTML = `
-    <td><input type="checkbox" class="selectFila" data-index="${idx}"></td>
-    <td><input type="text" value="${nombre}" style="width:100%; font-size:11px;"></td>
-    <td><input type="text" value="${superficie}" style="width:100%; font-size:11px;"></td>
-    <td><input type="text" value="${status}" style="width:100%; font-size:11px;"></td>
-    <td><input type="text" value="${status1}" style="width:100%; font-size:11px;"></td>
-    <td><input type="text" value="${status2}" style="width:100%; font-size:11px;"></td>
-    <td><input type="text" value="${status3}" style="width:100%; font-size:11px;"></td>
-    <td><input type="text" value="${partido}" style="width:100%; font-size:11px;"></td>
-    <td><input type="color" value="${colorMostrar}" class="colorInput" data-transparent="${esTransparente}" style="width:40px; height:20px;"></td>
-  `;
-  
-  // Agregar event listeners para detectar cambios
-  const inputs = tr.querySelectorAll('input[type="text"], input[type="color"]');
-  inputs.forEach(input => {
-    input.addEventListener('change', function() {
-      // Marcar archivo como modificado
-      if (pol.archivo_origen) {
-        marcarArchivoModificado(pol.archivo_origen);
-      }
-      console.log('✏️ Campo editado en polígono', idx);
-    });
-  });
-  
-  return tr;
-}
-
-// Toggle panel
 function togglePanelArchivos() {
-  console.log('📂 ========== TOGGLE PANEL DE ARCHIVOS ==========');
-  
   const panel = document.getElementById('panel-archivos-container');
-  console.log('📂 Panel encontrado:', !!panel);
-  
   if (panel) {
-    console.log('📂 Display actual:', panel.style.display);
-    
-    if (panel.style.display === 'none' || panel.style.display === '') {
-      console.log('📂 Abriendo panel...');
-      panel.style.display = 'block';
-      console.log('📂 Display después de abrir:', panel.style.display);
-      console.log('📂 Llamando a cargarListaArchivos()...');
-      cargarListaArchivos();
-    } else {
-      console.log('📂 Cerrando panel...');
-      panel.style.display = 'none';
-    }
-  } else {
-    console.error('❌ ERROR: No se encontró panel-archivos-container');
-    console.log('❌ Elementos en DOM:', document.querySelectorAll('[id*="archivos"]').length);
-  }
-  
-  console.log('📂 ========== FIN TOGGLE ==========');
-}
-
-// Marcar archivo como modificado
-function marcarArchivoModificado(nombreArchivo) {
-  console.log('✏️ Marcando archivo como modificado:', nombreArchivo);
-  
-  if (archivosAbiertos[nombreArchivo]) {
-    archivosAbiertos[nombreArchivo].modificado = true;
-    mostrarListaArchivosDisponibles();
+    panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
   }
 }
 
-console.log('✅ Funciones de selector de archivos cargadas');
+// Modificar input para cargar múltiples archivos
+document.addEventListener('DOMContentLoaded', function() {
+  const inputArchivo = document.getElementById('archivo');
+  if (inputArchivo) {
+    inputArchivo.addEventListener('change', async function(e) {
+      const files = e.target.files;
+      if (files.length === 0) return;
+      
+      for (let file of files) {
+        await cargarArchivoAdicional(file);
+      }
+      
+      e.target.value = '';
+      
+      const panel = document.getElementById('panel-archivos-container');
+      if (panel) panel.style.display = 'block';
+    });
+  }
+});
 
-
+}; // Fin de window.onload
 
 </script>
 </body>

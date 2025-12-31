@@ -51,17 +51,14 @@ else:
 app = Flask(__name__)
 app.secret_key = FLASK_SECRET_KEY
 
-# === OPTIMIZACIÓN: Compresión GZIP automática ===
-from flask_compress import Compress
-Compress(app)  # Reduce tamaño de respuestas en ~70%
-
 # Usuarios
 USERS = {
     "DSUBICI": {"password": "Banfi138", "rol": "admin"},
+    "RIVADAVIA": {"password": "rivadavia", "rol": "admin"},
     "usuario1": {"password": "contraseña1", "rol": "user"},
     "usuario2": {"password": "contraseña2", "rol": "user"},
     "usuario3": {"password": "contraseña3", "rol": "user"},
-    "usuario4": {"password": "contraseña4", "rol": "user"},
+    "FENOCCHIO": {"password": "fenocchio", "rol": "user"},
     "usuario5": {"password": "contraseña5", "rol": "user"},
     "usuario6": {"password": "contraseña6", "rol": "user"},
     "usuario7": {"password": "contraseña7", "rol": "user"},
@@ -214,16 +211,13 @@ def guardar_archivo(usuario, nombre_archivo, bytes_data):
 def procesar_color_con_transparencia(color_hex):
     """Procesa un color HEX y extrae el color base y la opacidad."""
     if not color_hex or not isinstance(color_hex, str):
-        return {"color": "#CCCCCC", "opacity": 0.6}
+        return {"color": "#CCCCCC", "opacity": 1.0}
     
-    color_hex = str(color_hex).strip()
+    color_hex = str(color_hex).strip().upper()
     
-    # Detectar "transparent" ANTES de procesar como hex
-    if color_hex.lower() == 'transparent':
-        print(f"🔵 Color transparent detectado - se mantendrá como 'transparent'")
+    # Manejar caso especial: "TRANSPARENT"
+    if color_hex == "TRANSPARENT":
         return {"color": "transparent", "opacity": 0.0}
-    
-    color_hex = color_hex.upper()
     
     if not color_hex.startswith("#"):
         color_hex = "#" + color_hex
@@ -237,20 +231,20 @@ def procesar_color_con_transparencia(color_hex):
             alpha_decimal = int(alpha_hex, 16) / 255.0
             opacity = round(alpha_decimal, 2)
         except ValueError:
-            opacity = 0.6
+            opacity = 1.0
         return {"color": color_base, "opacity": opacity}
     
     elif len(hex_sin_hash) == 6:
-        return {"color": color_hex, "opacity": 0.6}
+        return {"color": color_hex, "opacity": 1.0}
     
     elif len(hex_sin_hash) == 3:
         r, g, b = hex_sin_hash
         color_expandido = f"#{r}{r}{g}{g}{b}{b}"
-        return {"color": color_expandido, "opacity": 0.6}
+        return {"color": color_expandido, "opacity": 1.0}
     
     else:
         print(f"⚠️ Formato de color inválido: {color_hex}, usando color por defecto")
-        return {"color": "#CCCCCC", "opacity": 0.6}
+        return {"color": "#CCCCCC", "opacity": 1.0}
 
 # === Funciones de polígonos ===
 
@@ -263,10 +257,10 @@ def cargar_poligonos_desde_bytesio(bio):
         print(f"❌ Error leyendo Excel desde bytes: {e}")
         return []
     
-    columnas = ["NOMBRE", "SUPERFICIE", "STATUS", "STATUS1", "STATUS2", "STATUS3", "PARTIDO", "COLOR HEX", "OPACIDAD", "COORDENADAS"]
+    columnas = ["NOMBRE", "SUPERFICIE", "STATUS", "STATUS1", "STATUS2", "STATUS3", "PARTIDO", "COLOR HEX", "COORDENADAS"]
     for col in columnas:
         if col not in df.columns:
-            df[col] = "" if col != "OPACIDAD" else 0.6  # Default opacidad 0.6
+            df[col] = ""
     
     poligonos = []
     for idx, fila in df.iterrows():
@@ -285,16 +279,6 @@ def cargar_poligonos_desde_bytesio(bio):
         color_original = str(fila["COLOR HEX"]) if pd.notna(fila["COLOR HEX"]) else "#CCCCCC"
         color_info = procesar_color_con_transparencia(color_original)
         
-        # Leer opacidad del Excel si existe, sino usar la del color
-        opacidad_excel = fila.get("OPACIDAD", color_info["opacity"])
-        if pd.notna(opacidad_excel):
-            try:
-                opacidad = float(opacidad_excel)
-            except:
-                opacidad = color_info["opacity"]
-        else:
-            opacidad = color_info["opacity"]
-        
         poligonos.append({
             "name": str(fila["NOMBRE"]) if pd.notna(fila["NOMBRE"]) else "",
             "superficie": str(fila["SUPERFICIE"]) if pd.notna(fila["SUPERFICIE"]) else "",
@@ -304,7 +288,7 @@ def cargar_poligonos_desde_bytesio(bio):
             "status3": str(fila["STATUS3"]) if pd.notna(fila["STATUS3"]) else "",
             "partido": str(fila["PARTIDO"]) if pd.notna(fila["PARTIDO"]) else "",
             "color": color_info["color"],
-            "opacity": opacidad,  # Usar opacidad del Excel
+            "opacity": color_info["opacity"],
             "colorOriginal": color_original,
             "coords": coords,
             "COORDENADAS": str(fila["COORDENADAS"]) if pd.notna(fila["COORDENADAS"]) else ""
@@ -327,7 +311,7 @@ def guardar_poligonos(nuevos_datos, usuario, nombre_archivo):
             "STATUS3": d.get("status3", ""),
             "PARTIDO": d.get("partido", ""),
             "COLOR HEX": d.get("colorOriginal", d.get("color", "#CCCCCC")),
-            "OPACIDAD": d.get("opacidad", 0.6),  # ← NUEVO: Guardar opacidad
+            "OPACIDAD": d.get("opacidad", 0.6),
             "COORDENADAS": d.get("COORDENADAS", "")
         } for d in nuevos_datos
     ], columns=columnas)
@@ -354,7 +338,8 @@ def login():
         session["usuario"] = username
         session["rol"] = user["rol"]
         print(f"✅ Login exitoso: {username}")
-        return redirect(url_for("seleccionar_archivo"))
+        # IR DIRECTO AL MAPA (no a seleccionar archivo)
+        return redirect(url_for("mapa_vacio"))
     print(f"❌ Login fallido: {username}")
     return render_template("login.html", error="Usuario o contraseña incorrectos.")
 
@@ -377,6 +362,26 @@ def seleccionar_archivo():
                          archivos=archivos, 
                          usuario=user, 
                          rol=session.get("rol","user"))
+
+@app.route("/mapa", methods=["GET"])
+def mapa_vacio():
+    """Cargar mapa vacío, los archivos se cargan desde el panel"""
+    if "usuario" not in session:
+        return redirect(url_for("login_page"))
+    
+    user = session["usuario"]
+    rol = session.get("rol", "user")
+    
+    # Mapa sin polígonos iniciales (lista vacía)
+    poligonos_vacios = []
+    
+    print(f"🗺️ Cargando mapa vacío para: {user}")
+    
+    return render_template("mapa.html",
+                         poligonos=poligonos_vacios,
+                         usuario=user,
+                         rol=rol,
+                         nombre_archivo="")
 
 @app.route("/abrir/<nombre>")
 def abrir_archivo(nombre):
@@ -536,6 +541,247 @@ def guardar_como():
             "detalle": str(e),
             "tipo": "error"
         })
+
+# === NUEVAS RUTAS PARA MÚLTIPLES ARCHIVOS ===
+
+@app.route("/cargar_archivo_adicional", methods=["POST"])
+def cargar_archivo_adicional():
+    """
+    Carga un archivo adicional sin reemplazar los que ya están cargados.
+    Retorna los polígonos del nuevo archivo con identificador único.
+    """
+    if "usuario" not in session:
+        return jsonify({"success": False, "mensaje": "No autenticado"}), 401
+    
+    usuario = session["usuario"]
+    
+    if "archivo" not in request.files:
+        return jsonify({"success": False, "mensaje": "No se envió archivo"}), 400
+    
+    file = request.files["archivo"]
+    
+    if file.filename == "":
+        return jsonify({"success": False, "mensaje": "Archivo vacío"}), 400
+    
+    if not file.filename.lower().endswith('.xlsx'):
+        return jsonify({"success": False, "mensaje": "Solo archivos .xlsx permitidos"}), 400
+    
+    try:
+        # Leer Excel
+        df = pd.read_excel(file)
+        
+        # Procesar polígonos
+        poligonos = []
+        
+        for idx, row in df.iterrows():
+            # Convertir row a dict
+            data_dict = row.to_dict()
+            
+            # Crear estructura de polígono
+            poligono = {
+                "STATUS": [],
+                "geometry": None,
+                "color": data_dict.get("color", "#CCCCCC"),
+                "opacity": float(data_dict.get("opacity", 0.3)) if pd.notna(data_dict.get("opacity")) else 0.3,
+                "archivo_origen": file.filename,
+                "indice_original": idx
+            }
+            
+            # Convertir todas las columnas a STATUS
+            for col, val in data_dict.items():
+                if col.upper() == "COORDENADAS":
+                    # Coordenadas van en geometry
+                    if pd.notna(val) and str(val).strip():
+                        poligono["geometry"] = str(val).strip()
+                elif col.lower() not in ["color", "opacity"]:
+                    # Resto va en STATUS
+                    if pd.notna(val):
+                        poligono["STATUS"].append([col, str(val)])
+                    else:
+                        poligono["STATUS"].append([col, ""])
+            
+            poligonos.append(poligono)
+        
+        return jsonify({
+            "success": True,
+            "archivo": file.filename,
+            "poligonos": poligonos,
+            "total": len(poligonos)
+        })
+        
+    except Exception as e:
+        print(f"❌ Error cargando archivo adicional: {e}")
+        return jsonify({
+            "success": False,
+            "mensaje": f"Error al procesar archivo: {str(e)}"
+        }), 500
+
+
+@app.route("/guardar_archivo_especifico", methods=["POST"])
+def guardar_archivo_especifico():
+    """
+    Guarda cambios en un archivo específico usando formato original.
+    """
+    if "usuario" not in session:
+        return jsonify({"success": False, "mensaje": "No autenticado"}), 401
+    
+    usuario = session["usuario"]
+    data = request.get_json()
+    
+    nombre_archivo = data.get("nombre_archivo")
+    datos = data.get("datos", [])
+    
+    if not nombre_archivo:
+        return jsonify({"success": False, "mensaje": "Nombre de archivo requerido"}), 400
+    
+    if not datos:
+        return jsonify({"success": False, "mensaje": "Sin datos para guardar"}), 400
+    
+    try:
+        # Usar función guardar_poligonos original
+        exito = guardar_poligonos(datos, usuario, nombre_archivo)
+        
+        if exito:
+            return jsonify({
+                "success": True,
+                "mensaje": f"✅ Archivo {nombre_archivo} guardado correctamente",
+                "archivo": nombre_archivo
+            })
+        else:
+            return jsonify({
+                "success": False,
+                "mensaje": "Error al guardar archivo"
+            }), 500
+            
+    except Exception as e:
+        print(f"❌ Error en guardar_archivo_especifico: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            "success": False,
+            "mensaje": f"Error: {str(e)}"
+        }), 500
+
+
+@app.route("/listar_archivos_disponibles", methods=["GET"])
+def listar_archivos_disponibles():
+    """
+    Lista todos los archivos .xlsx disponibles en la carpeta del usuario
+    """
+    if "usuario" not in session:
+        return jsonify({"success": False, "mensaje": "No autenticado"}), 401
+    
+    usuario = session["usuario"]
+    
+    try:
+        if ES_LOCAL:
+            archivos = listar_archivos_local(usuario)
+        else:
+            archivos = listar_archivos_r2(usuario)
+        
+        return jsonify({
+            "success": True,
+            "archivos": archivos,
+            "total": len(archivos)
+        })
+        
+    except Exception as e:
+        print(f"❌ Error listando archivos: {e}")
+        return jsonify({
+            "success": False,
+            "mensaje": f"Error: {str(e)}"
+        }), 500
+
+
+@app.route("/cargar_archivo_desde_carpeta", methods=["POST"])
+def cargar_archivo_desde_carpeta():
+    """
+    Carga un archivo específico de la carpeta del usuario
+    """
+    if "usuario" not in session:
+        return jsonify({"success": False, "mensaje": "No autenticado"}), 401
+    
+    usuario = session["usuario"]
+    nombre_archivo = request.form.get('nombre_archivo')
+    
+    if not nombre_archivo:
+        return jsonify({"success": False, "mensaje": "Nombre de archivo requerido"}), 400
+    
+    try:
+        # Leer archivo
+        if ES_LOCAL:
+            bio = leer_archivo_local(usuario, nombre_archivo)
+        else:
+            bio = leer_archivo_r2(usuario, nombre_archivo)
+        
+        if not bio:
+            return jsonify({"success": False, "mensaje": "Archivo no encontrado"}), 404
+        
+        # Procesar Excel
+        df = pd.read_excel(bio)
+        poligonos = []
+        
+        print(f"📊 Columnas del archivo: {df.columns.tolist()}")
+        
+        for idx, row in df.iterrows():
+            data_dict = row.to_dict()
+            
+            # Buscar color en múltiples columnas posibles
+            color_hex = "#CCCCCC"  # Default
+            for col_name in ["COLOR HEX", "color", "Color", "COLOR"]:
+                if col_name in data_dict and pd.notna(data_dict[col_name]):
+                    color_hex = str(data_dict[col_name]).strip()
+                    # NO agregar # si es "transparent"
+                    if color_hex.lower() != 'transparent' and not color_hex.startswith('#'):
+                        color_hex = '#' + color_hex
+                    break
+            
+            # Procesar color con transparencia
+            color_info = procesar_color_con_transparencia(color_hex)
+            
+            poligono = {
+                "STATUS": [],
+                "geometry": None,
+                "color": color_info["color"],
+                "opacity": color_info["opacity"],
+                "archivo_origen": nombre_archivo,
+                "indice_original": idx
+            }
+            
+            # Procesar todas las columnas
+            for col, val in data_dict.items():
+                if col.upper() == "COORDENADAS":
+                    if pd.notna(val) and str(val).strip():
+                        poligono["geometry"] = str(val).strip()
+                else:
+                    # IMPORTANTE: Incluir TODOS los campos en STATUS (incluyendo color y opacity)
+                    if pd.notna(val):
+                        poligono["STATUS"].append([col, str(val)])
+                    else:
+                        poligono["STATUS"].append([col, ""])
+            
+            poligonos.append(poligono)
+        
+        print(f"✅ Procesados {len(poligonos)} polígonos")
+        if len(poligonos) > 0:
+            print(f"📊 Primer polígono - Color: {poligonos[0]['color']}, STATUS: {poligonos[0]['STATUS'][:3]}")
+        
+        return jsonify({
+            "success": True,
+            "archivo": nombre_archivo,
+            "poligonos": poligonos,
+            "total": len(poligonos)
+        })
+        
+    except Exception as e:
+        print(f"❌ Error cargando archivo desde carpeta: {e}")
+        return jsonify({
+            "success": False,
+            "mensaje": f"Error al cargar archivo: {str(e)}"
+        }), 500
+
+
+# === FIN NUEVAS RUTAS ===
 
 @app.route("/combinar_poligonos", methods=["POST"])
 def combinar_poligonos():
