@@ -315,7 +315,14 @@ tr.seleccionado { background-color:#FFFF99 !important; }
   bottom:60px; 
   right:60px; 
 }
-.menu-grabar div { padding:8px 12px; font-size:11px; cursor:pointer; }
+.menu-grabar div { 
+  padding:8px 12px; 
+  font-size:14px; 
+  font-family: Tahoma, Geneva, sans-serif; 
+  text-transform: uppercase; 
+  cursor:pointer; 
+  font-weight: 600;
+}
 .menu-grabar div:hover { background:#f0f0f0; }
 
 /* === TOAST NOTIFICATIONS === */
@@ -561,7 +568,7 @@ tr.seleccionado { background-color:#FFFF99 !important; }
   <div style="padding:10px; background:#0056b3; color:white; border-radius:5px 5px 0 0; display:flex; justify-content:space-between; align-items:center;">
     <div>
       <strong>📁 Archivos disponibles</strong>
-      <span id="contador-archivos" style="margin-left:10px; font-size:12px;">0 abiertos | 0 polígonos</span>
+      <span id="contador-archivos" style="margin-left:10px; font-size:18px;">0 abiertos | 0 polígonos</span>
     </div>
     <div>
       <button onclick="togglePanelArchivos()" style="background:#dc3545; color:white; border:none; padding:5px 10px; border-radius:3px; cursor:pointer;">
@@ -745,6 +752,7 @@ tr.seleccionado { background-color:#FFFF99 !important; }
       <div id="menu-grabar" class="menu-grabar">
         <div id="opcion-grabar-como">📝 Guardar como...</div>
         <div id="opcion-grabar-archivos">💾 Guardar archivos abiertos</div>
+        <div id="opcion-exportar-seleccion">📤 Exportar selección (A-G)</div>
       </div>
     </div>
   </div>
@@ -787,6 +795,7 @@ tr.seleccionado { background-color:#FFFF99 !important; }
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
 
 <script>
 // === VARIABLE GLOBAL PARA EL MAPA ===
@@ -2557,6 +2566,90 @@ document.getElementById('opcion-grabar-archivos').addEventListener('click', ()=>
   // Mostrar modal de selección
   mostrarModalSeleccionArchivos();
 });
+
+// === EXPORTAR SELECCIÓN (COLUMNAS A-G) ===
+document.getElementById('opcion-exportar-seleccion').addEventListener('click', async () => {
+  console.log('📤 Exportar selección (columnas A-G)');
+  document.getElementById('menu-grabar').style.display = 'none';
+  
+  // Verificar que haya polígonos seleccionados
+  if (seleccionados.size === 0) {
+    mostrarToast('Atención', 'Debe seleccionar al menos un polígono', 'warning');
+    return;
+  }
+  
+  try {
+    // Preparar datos leyendo desde la TABLA HTML
+    const datosExportar = [];
+    
+    // Recorrer todas las filas de la tabla
+    const filas = document.querySelectorAll('#tablaPoligonos tbody tr');
+    
+    filas.forEach(fila => {
+      const checkbox = fila.querySelector('input[type="checkbox"]');
+      
+      // Solo procesar filas seleccionadas
+      if (checkbox && checkbox.checked) {
+        const inputs = fila.querySelectorAll('input');
+        
+        // Extraer valores de los inputs
+        // El orden de inputs en la tabla es:
+        // [0] = checkbox
+        // [1] = NOMBRE
+        // [2] = HAS (SUPERFICIE)
+        // [3] = STATUS
+        // [4] = STATUS1
+        // [5] = STATUS2
+        // [6] = STATUS3
+        // [7] = PARTIDO
+        // [8] = COLOR
+        
+        const registro = {
+          'NOMBRE': inputs[1] ? inputs[1].value : '',
+          'SUPERFICIE': inputs[2] ? inputs[2].value : '',
+          'STATUS': inputs[3] ? inputs[3].value : '',
+          'STATUS1': inputs[4] ? inputs[4].value : '',
+          'STATUS2': inputs[5] ? inputs[5].value : '',
+          'STATUS3': inputs[6] ? inputs[6].value : '',
+          'PARTIDO': inputs[7] ? inputs[7].value : ''
+        };
+        
+        datosExportar.push(registro);
+      }
+    });
+    
+    if (datosExportar.length === 0) {
+      mostrarToast('Error', 'No hay datos para exportar', 'error');
+      return;
+    }
+    
+    console.log('📊 Exportando:', datosExportar.length, 'polígonos');
+    console.log('Datos:', datosExportar);
+    
+    // Crear Excel con SheetJS
+    const ws = XLSX.utils.json_to_sheet(datosExportar, {
+      header: ['NOMBRE', 'SUPERFICIE', 'STATUS', 'STATUS1', 'STATUS2', 'STATUS3', 'PARTIDO']
+    });
+    
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Selección');
+    
+    // Generar nombre de archivo con timestamp
+    const ahora = new Date();
+    const timestamp = ahora.toISOString().slice(0,19).replace(/[-:]/g,'').replace('T','_');
+    const nombreArchivo = `seleccion_${timestamp}.xlsx`;
+    
+    // Descargar
+    XLSX.writeFile(wb, nombreArchivo);
+    
+    mostrarToast('Exportado', `${datosExportar.length} polígonos exportados`, 'success');
+    
+  } catch (error) {
+    console.error('Error exportando selección:', error);
+    mostrarToast('Error', 'Error al exportar: ' + error.message, 'error');
+  }
+});
+
 
 document.getElementById('exportarPDF').addEventListener('click',()=>{
   const { jsPDF } = window.jspdf;
