@@ -257,7 +257,7 @@ def cargar_poligonos_desde_bytesio(bio):
         print(f"❌ Error leyendo Excel desde bytes: {e}")
         return []
     
-    columnas = ["NOMBRE", "SUPERFICIE", "STATUS", "STATUS1", "STATUS2", "STATUS3", "PARTIDO", "COLOR HEX", "COORDENADAS"]
+    columnas = ["NOMBRE", "SUPERFICIE", "STATUS", "STATUS1", "STATUS2", "STATUS3", "PARTIDO", "COLOR HEX", "OPACIDAD", "COORDENADAS"]
     for col in columnas:
         if col not in df.columns:
             df[col] = ""
@@ -279,6 +279,14 @@ def cargar_poligonos_desde_bytesio(bio):
         color_original = str(fila["COLOR HEX"]) if pd.notna(fila["COLOR HEX"]) else "#CCCCCC"
         color_info = procesar_color_con_transparencia(color_original)
         
+        # ⭐ Leer opacidad desde columna OPACIDAD si existe
+        opacidad_final = color_info["opacity"]  # Default desde el color
+        if "OPACIDAD" in fila and pd.notna(fila["OPACIDAD"]):
+            try:
+                opacidad_final = float(fila["OPACIDAD"])
+            except (ValueError, TypeError):
+                pass  # Mantener default
+        
         poligonos.append({
             "name": str(fila["NOMBRE"]) if pd.notna(fila["NOMBRE"]) else "",
             "superficie": str(fila["SUPERFICIE"]) if pd.notna(fila["SUPERFICIE"]) else "",
@@ -288,7 +296,7 @@ def cargar_poligonos_desde_bytesio(bio):
             "status3": str(fila["STATUS3"]) if pd.notna(fila["STATUS3"]) else "",
             "partido": str(fila["PARTIDO"]) if pd.notna(fila["PARTIDO"]) else "",
             "color": color_info["color"],
-            "opacity": color_info["opacity"],
+            "opacity": opacidad_final,  # ⭐ Usar opacidad del Excel
             "colorOriginal": color_original,
             "coords": coords,
             "COORDENADAS": str(fila["COORDENADAS"]) if pd.notna(fila["COORDENADAS"]) else ""
@@ -739,11 +747,23 @@ def cargar_archivo_desde_carpeta():
             # Procesar color con transparencia
             color_info = procesar_color_con_transparencia(color_hex)
             
+            # ⭐ CORRECCIÓN: Leer columna OPACIDAD del Excel si existe
+            opacidad_final = color_info["opacity"]  # Default desde el color
+            for col_name in ["OPACIDAD", "Opacidad", "opacidad", "opacity", "OPACITY"]:
+                if col_name in data_dict and pd.notna(data_dict[col_name]):
+                    try:
+                        opacidad_excel = float(data_dict[col_name])
+                        opacidad_final = opacidad_excel
+                        print(f"📊 Fila {idx}: Opacidad leída desde Excel: {opacidad_final}")
+                        break
+                    except (ValueError, TypeError) as e:
+                        print(f"⚠️ Fila {idx}: Error convirtiendo opacidad '{data_dict[col_name]}': {e}")
+            
             poligono = {
                 "STATUS": [],
                 "geometry": None,
                 "color": color_info["color"],
-                "opacity": color_info["opacity"],
+                "opacity": opacidad_final,  # ⭐ Usar opacidad del Excel si existe
                 "archivo_origen": nombre_archivo,
                 "indice_original": idx
             }
