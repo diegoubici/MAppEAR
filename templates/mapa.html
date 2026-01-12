@@ -2844,27 +2844,36 @@ document.getElementById("btnLimpiar").addEventListener("click", function() {
     mostrarToast('Limpieza completada', 'Filtros y campos de edición limpiados', 'info');
 });
 
-// === EVENT LISTENERS GLOBALES PARA DRAG-SELECT ===
-document.addEventListener('mouseup', function() {
-  if (dragSelecting) {
-    console.log(`✅ Drag-select completado: ${seleccionados.size} polígonos seleccionados`);
-    mostrarToast('Selección múltiple', `${seleccionados.size} polígonos seleccionados`, 'success');
-  }
-  mouseDownOnPolygon = false;
-  dragStarted = false;
-  dragSelecting = false;
+// === EVENT LISTENERS GLOBALES PARA DRAG-SELECT CON BOTÓN DERECHO ===
+
+// Prevenir menú contextual del navegador
+document.addEventListener('contextmenu', function(e) {
+  e.preventDefault();
 });
 
-// Prevenir que el drag-select se confunda con drag del mapa
-map.on('mousedown', function(e) {
-  if (!e.originalEvent.target.closest('.leaflet-interactive')) {
-    // Click en el mapa (no en polígono), desactivar drag-select
+// Detectar cuando se suelta el botón derecho
+document.addEventListener('mouseup', function(e) {
+  // Solo procesar si se soltó el botón derecho (button = 2)
+  if (e.button === 2) {
+    if (dragSelecting) {
+      console.log(`✅ Botón derecho soltado - Drag-select completado: ${seleccionados.size} polígonos seleccionados`);
+      mostrarToast('Selección múltiple', `${seleccionados.size} polígonos seleccionados`, 'success');
+    }
+    
+    // Resetear flags cuando se suelta el botón derecho
     mouseDownOnPolygon = false;
     dragSelecting = false;
   }
 });
 
+// Prevenir menú contextual en el mapa
+map.on('contextmenu', function(e) {
+  L.DomEvent.preventDefault(e);
+});
+
 console.log('✅ MAppEAR inicializado correctamente');
+console.log('🖱️ Controles: Botón IZQUIERDO = Click individual | Botón DERECHO = Drag-select múltiple');
+console.log('💡 Tip: Mantén presionado botón derecho y desliza sobre polígonos para seleccionar múltiples');
 
 }; // Fin de window.onload
 
@@ -3268,46 +3277,52 @@ async function abrirArchivo(nombreArchivo) {
             
             let clickReciente = false;
             
-            // EVENTO MOUSEDOWN - Iniciar posible drag
+            // EVENTO MOUSEDOWN - Detectar cuando se presiona botón derecho
             polygon.on('mousedown', function(e) {
-              mouseDownOnPolygon = true;
-              dragStarted = false;
-              dragSelecting = false;
-            });
-            
-            // EVENTO MOUSEMOVE - Activar drag-select si se mueve
-            polygon.on('mousemove', function(e) {
-              if (mouseDownOnPolygon && !dragStarted) {
-                dragStarted = true;
+              // Solo procesar botón derecho (button = 2)
+              if (e.originalEvent.button === 2) {
+                L.DomEvent.preventDefault(e);
+                L.DomEvent.stopPropagation(e);
+                
+                mouseDownOnPolygon = true;
                 dragSelecting = true;
-              }
-              
-              // Si está drag-selecting, seleccionar este polígono
-              if (dragSelecting && !seleccionados.has(indexGlobal)) {
-                seleccionados.add(indexGlobal);
-                const fila = document.querySelector(`#tablaPoligonos tbody tr[data-index="${indexGlobal}"]`);
-                if (fila) {
-                  fila.classList.add('seleccionado');
-                  const checkbox = fila.querySelector('input.selectFila');
-                  if (checkbox) checkbox.checked = true;
+                
+                // Seleccionar inmediatamente este polígono
+                if (!seleccionados.has(indexGlobal)) {
+                  seleccionados.add(indexGlobal);
+                  const fila = document.querySelector(`#tablaPoligonos tbody tr[data-index="${indexGlobal}"]`);
+                  if (fila) {
+                    fila.classList.add('seleccionado');
+                    const checkbox = fila.querySelector('input.selectFila');
+                    if (checkbox) checkbox.checked = true;
+                  }
+                  polygon.setStyle({
+                    weight: 2,
+                    color: '#000000'
+                  });
+                  console.log(`✅ Botón derecho presionado en polígono ${indexGlobal} - DRAG-SELECT ACTIVADO`);
                 }
-                polygon.setStyle({
-                  weight: 2,
-                  color: '#000000'
-                });
-                console.log(`✅ Drag-selected polígono ${indexGlobal}`);
               }
             });
             
-            // EVENTO MOUSEOVER (hover)
+            // EVENTO CONTEXTMENU - Solo prevenir menú contextual
+            polygon.on('contextmenu', function(e) {
+              L.DomEvent.preventDefault(e);
+              L.DomEvent.stopPropagation(e);
+            });
+            
+            // EVENTO MOUSEOVER - Seleccionar si botón derecho está presionado
             polygon.on('mouseover', function(e) {
               try {
                 const layer = e.target;
                 
                 if (clickReciente) return;
                 
-                // Si está drag-selecting, seleccionar este polígono
-                if (dragSelecting && !seleccionados.has(indexGlobal)) {
+                // CRÍTICO: Verificar que el botón derecho SIGUE presionado (buttons = 2)
+                const rightButtonPressed = (e.originalEvent.buttons === 2);
+                
+                // Si botón derecho está presionado Y está en modo drag-select
+                if (dragSelecting && rightButtonPressed && !seleccionados.has(indexGlobal)) {
                   seleccionados.add(indexGlobal);
                   const fila = document.querySelector(`#tablaPoligonos tbody tr[data-index="${indexGlobal}"]`);
                   if (fila) {
@@ -3319,7 +3334,8 @@ async function abrirArchivo(nombreArchivo) {
                     weight: 2,
                     color: '#000000'
                   });
-                  console.log(`✅ Drag-selected polígono ${indexGlobal}`);
+                  console.log(`✅ Drag-selected polígono ${indexGlobal} (botón presionado)`);
+                  return; // No hacer hover normal
                 }
                 
                 // Solo resaltar si NO está seleccionado
