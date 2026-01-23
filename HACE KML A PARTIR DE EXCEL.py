@@ -2,7 +2,7 @@ import pandas as pd
 import os
 
 # Ruta del archivo Excel (puede ser relativo o absoluto)
-file_path = 'LA PAMPA BARON.xlsx'
+file_path = 'C:\MAppEAR\data\DSUBICI\SOJA RIVADAVIA.xlsx'
 
 # Leer solo la primera hoja
 data = pd.read_excel(file_path, sheet_name=0)

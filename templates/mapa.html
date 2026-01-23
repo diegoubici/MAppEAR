@@ -7,9 +7,102 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css">
 <style>
 body { font-family: Arial, sans-serif; margin:0; padding:0; overflow:hidden; }
-header { background-color: #0056b3; color: white; padding: 10px; height:50px; }
-header h2 { margin:0; font-size:18px; display:inline-block; }
-header span { float:right; line-height:30px; }
+header { 
+  background: linear-gradient(135deg, #0056b3 0%, #003d82 100%);
+  color: white; 
+  padding: 10px 15px; 
+  height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  position: relative;
+  z-index: 1001;
+}
+header h2 { 
+  margin: 0; 
+  font-size: 16px; 
+  font-weight: 700;
+  display: inline-block;
+  margin-right: 15px;
+}
+header .archivos-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  font-size: 13px;
+}
+header .archivos-info .separador {
+  color: rgba(255,255,255,0.5);
+  margin: 0 5px;
+}
+header .archivo-tag {
+  background: rgba(255, 255, 255, 0.25);
+  padding: 3px 8px;
+  border-radius: 3px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 600;
+  font-size: 11px;
+  transition: all 0.2s;
+  border: 1px solid rgba(255,255,255,0.3);
+  color: #fff;
+}
+header .archivo-tag:hover {
+  background: rgba(255, 255, 255, 0.35);
+}
+header .archivo-tag.modificado {
+  background: #ffc107;
+  color: #000;
+  font-weight: 700;
+  border: 1px solid #ff9800;
+  animation: pulse 2s infinite;
+}
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.7); }
+  50% { box-shadow: 0 0 0 3px rgba(255, 193, 7, 0); }
+}
+header .archivo-tag .close-archivo {
+  cursor: pointer;
+  font-weight: bold;
+  color: #fff;
+  margin-left: 4px;
+  font-size: 14px;
+  line-height: 1;
+  transition: transform 0.2s;
+}
+header .archivo-tag .close-archivo:hover {
+  transform: scale(1.3);
+  color: #ff4444;
+}
+header .archivo-tag.modificado .close-archivo {
+  color: #000;
+}
+header .archivo-tag.modificado .close-archivo:hover {
+  color: #d32f2f;
+}
+header .header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+header .btn-archivos {
+  background: rgba(255,255,255,0.2);
+  border: 1px solid rgba(255,255,255,0.4);
+  color: white;
+  padding: 5px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+header .btn-archivos:hover {
+  background: rgba(255,255,255,0.3);
+  transform: translateY(-1px);
+}
 
 #map { position: fixed; top: 50px; left: 0; width: 100%; height: calc(100% - 50px); z-index:0; }
 
@@ -528,8 +621,21 @@ tr.seleccionado { background-color:#FFFF99 !important; }
 <body>
 
 <header>
-<h2>MAppEAR - {{ archivo_nombre }} - {{ usuario }}</h2>
-<span><a href="/logout" style="color:white;">Cerrar sesión</a></span>
+  <h2 id="header-titulo">MAppEAR</h2>
+  <div class="archivos-info">
+    <span class="separador">|</span>
+    <span id="usuario-header">Usuario</span>
+    <span class="separador">|</span>
+    <span id="lista-archivos-header">
+      <span style="color: #e0e0e0; font-style: italic; font-size: 11px;">Ningún archivo abierto</span>
+    </span>
+  </div>
+  <div class="header-actions">
+    <button class="btn-archivos" onclick="togglePanelArchivos()" title="Abrir/gestionar archivos">
+      📁 Archivos <span id="contador-archivos-btn">0</span>
+    </button>
+    <a href="/logout" style="color:white; text-decoration:none; font-size:12px;">Cerrar sesión</a>
+  </div>
 </header>
 
 <!-- PANEL DE ARCHIVOS DISPONIBLES -->
@@ -791,6 +897,13 @@ const archivosCargados = {};
 const poligonos = {{ poligonos|tojson }};
 esUsuarioDSUBICI = "{{ usuario }}" === "DSUBICI";
 
+// Inicializar usuario en el header
+const usuarioHeader = document.getElementById('usuario-header');
+if (usuarioHeader) {
+  const usuario = "{{ usuario }}";
+  usuarioHeader.textContent = `Usuario: ${usuario}`;
+}
+
 // Declarar map como variable GLOBAL (sin const)
 map = L.map('map').setView([-35, -63], 8);
 
@@ -1047,6 +1160,17 @@ poligonos.forEach((p, idx)=>{
           console.log('Click reciente, no mostrar tooltip');
           return;
         }
+        
+        // LIMPIAR TODOS LOS HOVERS PREVIOS antes de aplicar el nuevo
+        leafletPoligonos.forEach((otherPoly, otherIdx) => {
+          if (otherPoly && otherIdx !== idx && !seleccionados.has(otherIdx)) {
+            otherPoly.setStyle({
+              weight: 0.5,
+              color: '#000000'
+            });
+            otherPoly.closeTooltip();
+          }
+        });
         
         // Solo resaltar si NO está seleccionado
         if(!seleccionados.has(idx)) {
@@ -1871,6 +1995,17 @@ if(esUsuarioDSUBICI) {
         });
         
         nuevoPoly.on('mouseover', function(e) {
+          // LIMPIAR TODOS LOS HOVERS PREVIOS
+          leafletPoligonos.forEach((otherPoly, otherIdx) => {
+            if (otherPoly && otherIdx !== nuevoIdx && !seleccionados.has(otherIdx)) {
+              otherPoly.setStyle({
+                weight: 0.5,
+                color: '#000000'
+              });
+              otherPoly.closeTooltip();
+            }
+          });
+          
           if (!seleccionados.has(nuevoIdx)) {
             e.target.setStyle({ weight: 2, color: '#000000' });
           }
@@ -2911,7 +3046,7 @@ function toggleSeleccion(idx){
     if (checkbox) checkbox.checked = true;
     if(leafletPoligonos[idx]) {
       leafletPoligonos[idx].setStyle({
-        weight: 2,
+        weight: 3,
         color: '#000000'  // Negro para selección
       });
       
@@ -3338,6 +3473,17 @@ async function abrirArchivo(nombreArchivo) {
                   return; // No hacer hover normal
                 }
                 
+                // LIMPIAR TODOS LOS HOVERS PREVIOS antes de aplicar el nuevo
+                leafletPoligonos.forEach((otherPoly, otherIdx) => {
+                  if (otherPoly && otherIdx !== indexGlobal && !seleccionados.has(otherIdx)) {
+                    otherPoly.setStyle({
+                      weight: 0.5,
+                      color: '#000000'
+                    });
+                    otherPoly.closeTooltip();
+                  }
+                });
+                
                 // Solo resaltar si NO está seleccionado
                 if (!seleccionados.has(indexGlobal)) {
                   layer.setStyle({
@@ -3457,6 +3603,45 @@ async function abrirArchivo(nombreArchivo) {
     });
     
     console.log('✅ Polígonos dibujados:', poligonosDibujados, 'con eventos completos');
+    
+    // ⭐ CENTRAR MAPA EN TERCIO IZQUIERDO
+    if (poligonosDibujados > 0) {
+      // Obtener todos los bounds de los polígonos del archivo
+      const bounds = L.latLngBounds();
+      data.poligonos.forEach((pol, idx) => {
+        const globalIdx = poligonosTodos.length - data.poligonos.length + idx;
+        if (leafletPoligonos[globalIdx]) {
+          bounds.extend(leafletPoligonos[globalIdx].getBounds());
+        }
+      });
+      
+      // Hacer fit inicial
+      map.fitBounds(bounds, { padding: [50, 50] });
+      
+      // Después de un pequeño delay (para que fitBounds termine), aplicar el offset
+      setTimeout(() => {
+        const currentCenter = map.getCenter();
+        const mapSize = map.getSize();
+        const mapWidth = mapSize.x;
+        
+        // Calcular cuánto desplazar para que quede en tercio izquierdo
+        const targetOffsetX = mapWidth / 3;  // Queremos que esté a 1/3 del borde izquierdo
+        const centerOffsetX = mapWidth / 2;  // Ahora está en el centro
+        const shiftX = centerOffsetX - targetOffsetX;  // Diferencia
+        
+        // Convertir el centro a punto de pantalla
+        const point = map.latLngToContainerPoint(currentCenter);
+        point.x += shiftX;  // Desplazar hacia la derecha
+        
+        // Convertir de vuelta a coordenadas
+        const newCenter = map.containerPointToLatLng(point);
+        
+        // Aplicar el nuevo centro con animación suave
+        map.panTo(newCenter, { animate: true, duration: 0.5 });
+        
+        console.log('📍 Mapa centrado en tercio izquierdo');
+      }, 100);
+    }
     
     mostrarListaArchivosDisponibles();
     actualizarContadores();
@@ -4065,6 +4250,54 @@ function actualizarContadores() {
   if (contadorBtn) {
     contadorBtn.textContent = totalAbiertos;
   }
+  
+  // ACTUALIZAR LISTA DE ARCHIVOS EN EL HEADER
+  actualizarListaArchivosHeader();
+}
+
+// Nueva función para actualizar la lista de archivos en el header
+function actualizarListaArchivosHeader() {
+  const listaHeader = document.getElementById('lista-archivos-header');
+  if (!listaHeader) return;
+  
+  listaHeader.innerHTML = '';
+  
+  const numArchivos = Object.keys(archivosAbiertos).length;
+  
+  if (numArchivos === 0) {
+    listaHeader.innerHTML = '<span style="color: #e0e0e0; font-style: italic; font-size: 11px;">Ningún archivo abierto</span>';
+    return;
+  }
+  
+  // Crear un contenedor flex para los tags
+  const container = document.createElement('div');
+  container.style.cssText = 'display: flex; gap: 6px; align-items: center; flex-wrap: wrap;';
+  
+  // Crear un tag para cada archivo
+  Object.entries(archivosAbiertos).forEach(([nombre, info], index) => {
+    const tag = document.createElement('div');
+    tag.className = 'archivo-tag' + (info.modificado ? ' modificado' : '');
+    tag.title = info.modificado ? 
+      `${nombre} - MODIFICADO (sin guardar) - ${info.poligonos.length} polígonos` : 
+      `${nombre} - ${info.poligonos.length} polígonos`;
+    
+    // Nombre del archivo (acortar si es muy largo)
+    const nombreCorto = nombre.length > 20 ? nombre.substring(0, 17) + '...' : nombre;
+    
+    // Mostrar cantidad de polígonos
+    const cantPoligonos = info.poligonos.length;
+    
+    tag.innerHTML = `
+      <span>${info.modificado ? '● ' : ''}${nombreCorto} (${cantPoligonos})</span>
+      <span class="close-archivo" onclick="cerrarArchivo('${nombre.replace(/'/g, "\\'")}'); event.stopPropagation();" title="Cerrar archivo">×</span>
+    `;
+    
+    container.appendChild(tag);
+  });
+  
+  listaHeader.appendChild(container);
+  
+  console.log('📋 Lista de archivos en header actualizada:', numArchivos, 'archivos');
 }
 
 // Actualizar tabla de polígonos (VERSIÓN CORREGIDA)
